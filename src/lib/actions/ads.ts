@@ -46,16 +46,22 @@ export async function searchAds(filter: AdFilter) {
     ...(Object.keys(profileFilter).length > 0 && { profile: profileFilter }),
   };
 
+  // Tri global Phase 2 :
+  //   1. Sticky en cours en premier (stickyUntil > now)
+  //   2. Tier (VIP > PREMIUM > STANDARD)
+  //   3. Bump récent (lastBumpedAt récent prioritaire)
+  //   4. Critère secondaire (popularité, prix, date)
   const orderBy: Prisma.AdOrderByWithRelationInput[] = (() => {
+    const head: Prisma.AdOrderByWithRelationInput[] = [
+      { stickyUntil: { sort: "desc", nulls: "last" } },
+      { tier: "desc" },
+      { lastBumpedAt: { sort: "desc", nulls: "last" } },
+    ];
     switch (parsed.sort) {
-      case "price_asc":
-        return [{ tier: "desc" }, { price: "asc" }];
-      case "price_desc":
-        return [{ tier: "desc" }, { price: "desc" }];
-      case "popular":
-        return [{ tier: "desc" }, { views: "desc" }];
-      default:
-        return [{ tier: "desc" }, { publishedAt: "desc" }];
+      case "price_asc":  return [...head, { price: "asc" }];
+      case "price_desc": return [...head, { price: "desc" }];
+      case "popular":    return [...head, { views: "desc" }];
+      default:           return [...head, { publishedAt: "desc" }];
     }
   })();
 
@@ -154,6 +160,17 @@ export async function createAdAction(
 
   const photoUrls = formData.getAll("mediaUrls").map(String).filter(Boolean);
   const videoUrls = formData.getAll("videoUrls").map(String).filter(Boolean);
+
+  // I6 — Cap photos selon le tier (annonce nouvelle = STANDARD au départ)
+  // L'escort pourra publier plus de photos après avoir upgradé son tier.
+  const { getPhotoCapForTier } = await import("@/lib/actions/wallet");
+  const photoCap = await getPhotoCapForTier("STANDARD");
+  if (photoUrls.length > photoCap) {
+    return {
+      ok: false,
+      error: `Limite photos atteinte : ${photoCap} max en plan Standard. Passez en Premium ou VIP pour en publier plus.`,
+    };
+  }
 
   // On ordonne : photos d'abord (la 1ère sera isPrimary), vidéos ensuite
   const mediaCreates = [

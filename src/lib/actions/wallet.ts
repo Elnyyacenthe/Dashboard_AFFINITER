@@ -548,6 +548,207 @@ async function maybeReferralBonusOnPayment(userId: string, paymentAmount: number
 }
 
 // =====================================================================
+// PHASE 2 — I1 BUMP : remontée d'annonce 24h
+// =====================================================================
+
+/**
+ * Bump : remonte l'annonce en tête de liste (tri = lastBumpedAt DESC).
+ * Effet visuel pendant 24h, configurable via SiteSetting `pricing.bump.amount`.
+ * Délai mini entre 2 bumps : `bump.min.interval.hours` (default 6h, anti-abus).
+ */
+export async function bumpAdAction(
+  adId: string,
+): Promise<{ ok: true; bumpedAt: Date; message: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Non authentifié" };
+
+  const ad = await prisma.ad.findUnique({
+    where: { id: adId },
+    select: { id: true, ownerId: true, status: true, lastBumpedAt: true, title: true },
+  });
+  if (!ad) return { ok: false, error: "Annonce introuvable" };
+  if (ad.ownerId !== session.user.id) return { ok: false, error: "Non autorisé" };
+  if (ad.status !== "ACTIVE") {
+    return { ok: false, error: "L'annonce doit être ACTIVE pour être Bumpée" };
+  }
+
+  // Anti-abus : délai mini entre 2 bumps
+  const minHours = await getSettingNumber("bump.min.interval.hours", 6);
+  if (ad.lastBumpedAt) {
+    const elapsed = Date.now() - ad.lastBumpedAt.getTime();
+    const minMs = minHours * 60 * 60 * 1000;
+    if (elapsed < minMs) {
+      const remaining = Math.ceil((minMs - elapsed) / 3_600_000);
+      return {
+        ok: false,
+        error: `Vous pouvez rebump dans ${remaining}h (min ${minHours}h entre 2 Bumps).`,
+      };
+    }
+  }
+
+  const price = await getSettingNumber("pricing.bump.amount", 500);
+
+  // Débit wallet atomique
+  try {
+    await applyWalletDelta({
+      userId: session.user.id,
+      amount: -price,
+      type: "BOOST_PAYMENT",
+      description: `Bump annonce "${ad.title}"`,
+      reference: `bump_${adId}_${Date.now()}`,
+      metadata: { adId, type: "BUMP" },
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Solde insuffisant" };
+  }
+
+  // Update annonce
+  const now = new Date();
+  await prisma.ad.update({
+    where: { id: adId },
+    data: { lastBumpedAt: now, bumpCount: { increment: 1 } },
+  });
+
+  // Payment record
+  await prisma.payment.create({
+    data: {
+      userId: session.user.id,
+      adId,
+      amount: price,
+      provider: "WALLET",
+      status: "PAID",
+      paidAt: now,
+      metadata: { type: "BUMP" },
+    },
+  });
+
+  await maybeReferralBonusOnPayment(session.user.id, price);
+
+  revalidatePath("/");
+  revalidatePath("/escort/annonces");
+  return {
+    ok: true,
+    bumpedAt: now,
+    message: `Annonce Bumpée — visible en tête pendant 24h ! (${price} FCFA débité)`,
+  };
+}
+
+// =====================================================================
+// PHASE 2 — I2 STICKY 24H : épingle l'annonce au top de sa ville
+// =====================================================================
+
+/**
+ * Sticky 24h : épingle l'annonce au sommet de la page ville pendant N heures
+ * (default 24h). Plus cher qu'un Bump mais visibilité maximale.
+ */
+export async function stickyAdAction(
+  adId: string,
+): Promise<{ ok: true; stickyUntil: Date; message: string } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Non authentifié" };
+
+  const ad = await prisma.ad.findUnique({
+    where: { id: adId },
+    select: { id: true, ownerId: true, status: true, title: true, stickyUntil: true },
+  });
+  if (!ad) return { ok: false, error: "Annonce introuvable" };
+  if (ad.ownerId !== session.user.id) return { ok: false, error: "Non autorisé" };
+  if (ad.status !== "ACTIVE") {
+    return { ok: false, error: "L'annonce doit être ACTIVE" };
+  }
+
+  const price = await getSettingNumber("pricing.sticky.amount", 2000);
+  const hours = await getSettingNumber("pricing.sticky.hours", 24);
+
+  try {
+    await applyWalletDelta({
+      userId: session.user.id,
+      amount: -price,
+      type: "BOOST_PAYMENT",
+      description: `Sticky ${hours}h sur "${ad.title}"`,
+      reference: `sticky_${adId}_${Date.now()}`,
+      metadata: { adId, type: "STICKY", hours },
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Solde insuffisant" };
+  }
+
+  // Si déjà sticky, on cumule la durée
+  const now = new Date();
+  const baseTime = ad.stickyUntil && ad.stickyUntil > now ? ad.stickyUntil : now;
+  const stickyUntil = new Date(baseTime.getTime() + hours * 60 * 60 * 1000);
+
+  await prisma.ad.update({
+    where: { id: adId },
+    data: { stickyUntil },
+  });
+
+  await prisma.payment.create({
+    data: {
+      userId: session.user.id,
+      adId,
+      amount: price,
+      provider: "WALLET",
+      status: "PAID",
+      paidAt: now,
+      metadata: { type: "STICKY", hours },
+    },
+  });
+
+  await maybeReferralBonusOnPayment(session.user.id, price);
+
+  revalidatePath("/");
+  revalidatePath("/escort/annonces");
+  return {
+    ok: true,
+    stickyUntil,
+    message: `Annonce épinglée jusqu'à ${stickyUntil.toLocaleString("fr-FR")} 🚀`,
+  };
+}
+
+// =====================================================================
+// PHASE 2 — I8 VÉRIFICATION PAYANTE
+// =====================================================================
+
+/**
+ * Débite le wallet du prix de la vérification d'identité.
+ * Appelé depuis submitVerificationAction APRÈS validation des documents,
+ * AVANT de créer la row IdVerification.
+ *
+ * Retourne true si débit OK ou si gratuit (prix = 0), false sinon.
+ */
+export async function chargeVerificationFee(
+  userId: string,
+): Promise<{ ok: true; charged: number } | { ok: false; error: string }> {
+  const price = await getSettingNumber("pricing.verification.amount", 3000);
+  if (price <= 0) return { ok: true, charged: 0 };
+
+  try {
+    await applyWalletDelta({
+      userId,
+      amount: -price,
+      type: "BOOST_PAYMENT",
+      description: `Vérification d'identité`,
+      reference: `verif_${userId}_${Date.now()}`,
+      metadata: { type: "VERIFICATION" },
+    });
+    await prisma.payment.create({
+      data: {
+        userId,
+        amount: price,
+        provider: "WALLET",
+        status: "PAID",
+        paidAt: new Date(),
+        metadata: { type: "VERIFICATION" },
+      },
+    });
+    return { ok: true, charged: price };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Solde insuffisant" };
+  }
+}
+
+// =====================================================================
 // Helpers réglages
 // =====================================================================
 
@@ -556,4 +757,13 @@ export async function getSettingNumber(key: string, fallback: number): Promise<n
   if (!setting) return fallback;
   const n = Number(setting.value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * Cap photos selon le tier d'une annonce (ou DRAFT/PENDING → cap Standard).
+ */
+export async function getPhotoCapForTier(tier: "STANDARD" | "PREMIUM" | "VIP"): Promise<number> {
+  if (tier === "VIP") return getSettingNumber("photos.cap.vip", 15);
+  if (tier === "PREMIUM") return getSettingNumber("photos.cap.premium", 5);
+  return getSettingNumber("photos.cap.standard", 3);
 }

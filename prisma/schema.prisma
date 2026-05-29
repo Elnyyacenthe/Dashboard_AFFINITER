@@ -323,6 +323,10 @@ model Ad {
   expiresAt       DateTime?
   promotedUntil   DateTime?
   publishedAt     DateTime?
+  // Phase 2 — Bump & Sticky 24h
+  lastBumpedAt    DateTime?
+  stickyUntil     DateTime?
+  bumpCount       Int      @default(0)
 
   owner     User            @relation("AdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   profile   EscortProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
@@ -340,6 +344,8 @@ model Ad {
   @@index([cityId, status])
   @@index([ownerId])
   @@index([slug])
+  @@index([stickyUntil])
+  @@index([lastBumpedAt])
 }
 
 model Media {

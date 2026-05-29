@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatXAF, timeAgo } from "@/lib/utils";
-import { ToggleAdButton, DeleteAdButton } from "./_components/ad-actions";
+import { ToggleAdButton, DeleteAdButton, BumpAdButton, StickyAdButton } from "./_components/ad-actions";
+import { getSettingNumber } from "@/lib/actions/wallet";
 
 const STATUS_LABEL: Record<string, { label: string; variant: "secondary" | "success" | "destructive" | "outline" }> = {
   DRAFT: { label: "Brouillon", variant: "outline" },
@@ -22,14 +23,18 @@ const STATUS_LABEL: Record<string, { label: string; variant: "secondary" | "succ
 
 export default async function MyAdsPage() {
   const session = await auth();
-  const ads = await prisma.ad.findMany({
-    where: { ownerId: session!.user.id },
-    include: {
-      city: true,
-      media: { take: 1, orderBy: { position: "asc" } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [ads, bumpPrice, stickyPrice] = await Promise.all([
+    prisma.ad.findMany({
+      where: { ownerId: session!.user.id },
+      include: {
+        city: true,
+        media: { take: 1, orderBy: { position: "asc" } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    getSettingNumber("pricing.bump.amount", 500),
+    getSettingNumber("pricing.sticky.amount", 2000),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -105,6 +110,12 @@ export default async function MyAdsPage() {
                         <Edit className="h-4 w-4" /> Modifier
                       </Link>
                     </Button>
+                    {ad.status === "ACTIVE" && (
+                      <>
+                        <BumpAdButton adId={ad.id} price={bumpPrice} />
+                        <StickyAdButton adId={ad.id} price={stickyPrice} />
+                      </>
+                    )}
                     {(ad.status === "ACTIVE" || ad.status === "PAUSED") && (
                       <ToggleAdButton adId={ad.id} isActive={ad.status === "ACTIVE"} />
                     )}

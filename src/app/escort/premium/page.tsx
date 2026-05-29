@@ -13,11 +13,13 @@ export default async function PremiumPage() {
   const session = await auth();
 
   // Lecture des prix dynamiques depuis SiteSetting (modifiables par admin)
-  const [premiumPrice, vipPrice, premiumDays, vipDays, user] = await Promise.all([
+  const [premiumPrice, vipPrice, diamondPrice, premiumDays, vipDays, diamondDays, user] = await Promise.all([
     getSettingNumber("pricing.premium.amount", 5000),
     getSettingNumber("pricing.vip.amount", 15000),
+    getSettingNumber("pricing.diamond.amount", 50000),
     getSettingNumber("pricing.premium.days", 30),
     getSettingNumber("pricing.vip.days", 30),
+    getSettingNumber("pricing.diamond.days", 30),
     session?.user
       ? prisma.user.findUnique({
           where: { id: session.user.id },
@@ -27,7 +29,7 @@ export default async function PremiumPage() {
   ]);
 
   type Plan = {
-    tier: "STANDARD" | "PREMIUM" | "VIP";
+    tier: "STANDARD" | "PREMIUM" | "VIP" | "DIAMOND";
     name: string;
     price: number;
     days: number;
@@ -49,7 +51,7 @@ export default async function PremiumPage() {
         "Publication gratuite",
         "Modération sous 24h",
         "Contact WhatsApp masqué",
-        "5 photos max",
+        "3 photos max",
       ],
     },
     {
@@ -64,7 +66,7 @@ export default async function PremiumPage() {
         "Tout du Standard",
         "Mise en avant sur ville",
         "Badge Premium visible",
-        "10 photos max",
+        "5 photos max",
         `${premiumDays} jours de boost`,
       ],
     },
@@ -80,9 +82,27 @@ export default async function PremiumPage() {
         "Tout du Premium",
         "Top de la page d'accueil",
         "Badge VIP doré",
-        "Photos illimitées",
+        "15 photos max",
         `Boost prioritaire ${vipDays}j`,
         "Support dédié",
+      ],
+    },
+    {
+      tier: "DIAMOND",
+      name: "Diamond",
+      price: diamondPrice,
+      days: diamondDays,
+      icon: Crown,
+      color: "border-cyan-400/60",
+      badge: "💎 1 SLOT / VILLE",
+      features: [
+        "Tout du VIP",
+        "🥇 SEULE annonce Diamond de la ville",
+        "Badge Diamond brillant",
+        "Photos illimitées",
+        "Apparition exclusive en home",
+        "Notification push de tous les clients",
+        `${diamondDays}j d'exclusivité`,
       ],
     },
   ];
@@ -106,7 +126,7 @@ export default async function PremiumPage() {
         </p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {PLANS.map((plan) => {
           const Icon = plan.icon;
           const isStandard = plan.tier === "STANDARD";

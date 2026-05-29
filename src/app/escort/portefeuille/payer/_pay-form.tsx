@@ -16,7 +16,7 @@ import {
 } from "@/lib/actions/wallet";
 
 interface Props {
-  tier: "PREMIUM" | "VIP";
+  tier: "PREMIUM" | "VIP" | "DIAMOND";
   amount: number;
   defaultPhone: string;
   walletBalance: number;
@@ -26,6 +26,7 @@ export function PayTierForm({ tier, amount, defaultPhone, walletBalance }: Props
   const router = useRouter();
   const [mode, setMode] = useState<"wallet" | "momo">(walletBalance >= amount ? "wallet" : "momo");
   const [phone, setPhone] = useState(defaultPhone);
+  const [autoRenew, setAutoRenew] = useState(true); // I5 — opt-in par défaut (UX gain)
   const [pending, startTransition] = useTransition();
   const [pendingPaymentId, setPendingPaymentId] = useState<string | null>(null);
 
@@ -35,7 +36,7 @@ export function PayTierForm({ tier, amount, defaultPhone, walletBalance }: Props
       const res = await checkAndApplyDepositAction(pendingPaymentId);
       if (res.ok && res.status === "SUCCESS") {
         clearInterval(interval);
-        const buyRes = await payTierFromWalletAction({ tier });
+        const buyRes = await payTierFromWalletAction({ tier, autoRenew });
         if (buyRes.ok) {
           toast.success(buyRes.message);
           router.push("/escort/dashboard");
@@ -61,7 +62,7 @@ export function PayTierForm({ tier, amount, defaultPhone, walletBalance }: Props
 
   function payWithWallet() {
     startTransition(async () => {
-      const res = await payTierFromWalletAction({ tier });
+      const res = await payTierFromWalletAction({ tier, autoRenew });
       if (res.ok) {
         toast.success(res.message);
         router.push("/escort/dashboard");
@@ -138,6 +139,23 @@ export function PayTierForm({ tier, amount, defaultPhone, walletBalance }: Props
           />
         </div>
       )}
+
+      {/* I5 — Auto-renouvellement opt-in */}
+      <label className="flex items-start gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/5 p-3">
+        <input
+          type="checkbox"
+          checked={autoRenew}
+          onChange={(e) => setAutoRenew(e.target.checked)}
+          className="mt-0.5 h-4 w-4 accent-emerald-500"
+        />
+        <div className="text-left">
+          <p className="text-sm font-semibold">Activer l'auto-renouvellement ♻️</p>
+          <p className="text-xs text-muted-foreground">
+            À expiration, le tier se renouvelle automatiquement depuis votre wallet — pas d'oubli, pas de chute de visibilité.
+            Désactivable à tout moment depuis /escort/annonces.
+          </p>
+        </div>
+      </label>
 
       <Button
         onClick={mode === "wallet" ? payWithWallet : payWithMomo}

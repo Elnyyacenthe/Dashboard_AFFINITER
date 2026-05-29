@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, LayoutDashboard, ListChecks, User, BarChart3, CreditCard, Wallet, BadgeCheck, Gift } from "lucide-react";
+import { Flame, LayoutDashboard, ListChecks, User, BarChart3, CreditCard, Wallet, BadgeCheck, Gift, MessageSquare } from "lucide-react";
 
 import { auth } from "@/auth";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -39,6 +39,7 @@ export default async function EscortLayout({ children }: { children: React.React
               { href: "/escort/premium", label: "Boost / Premium", icon: <CreditCard className="h-4 w-4" /> },
               { href: "/escort/portefeuille", label: "Portefeuille", icon: <Wallet className="h-4 w-4" /> },
               { href: "/escort/parrainage", label: "Parrainage", icon: <Gift className="h-4 w-4" /> },
+              { href: "/support", label: "Service client", icon: <MessageSquare className="h-4 w-4" /> },
             ]}
           />
           <Separator className="my-4" />

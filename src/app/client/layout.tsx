@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Flame, LayoutDashboard, Heart, Wallet, Gift, User, Search, MapPin } from "lucide-react";
+import { Flame, LayoutDashboard, Heart, Wallet, Gift, User, Search, MapPin, Crown, MessageSquare } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -36,8 +36,10 @@ export default async function ClientLayout({ children }: { children: React.React
             items={[
               { href: "/client", label: "Vue d'ensemble", icon: <LayoutDashboard className="h-4 w-4" /> },
               { href: "/client/favoris", label: "Mes favoris", icon: <Heart className="h-4 w-4" />, badge: favCount },
+              { href: "/client/pass-premium", label: "Pass Premium 💎", icon: <Crown className="h-4 w-4" /> },
               { href: "/client/portefeuille", label: "Portefeuille", icon: <Wallet className="h-4 w-4" /> },
               { href: "/client/parrainage", label: "Parrainage", icon: <Gift className="h-4 w-4" /> },
+              { href: "/support", label: "Service client", icon: <MessageSquare className="h-4 w-4" /> },
               { href: "/client/compte", label: "Mon compte", icon: <User className="h-4 w-4" /> },
             ]}
           />

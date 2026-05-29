@@ -181,6 +181,12 @@ model User {
   // === Anti-réinscription après suppression ===
   identityHash      String?                          // SHA-256 du numéro d'ID — permet de bannir définitivement
 
+  // === I9 Pass Premium Client ===
+  clientPassUntil     DateTime?    // > now() = abonnement Pass actif
+  dailyRevealsCount   Int          @default(0)
+  dailyRevealsResetAt DateTime?
+  numberReveals       NumberReveal[]
+
   accounts          Account[]
   sessions          Session[]
   escortProfile     EscortProfile?
@@ -391,6 +397,7 @@ model Ad {
   favorites Favorite[]
   viewsLog  AdView[]
   payments  Payment[]
+  numberReveals NumberReveal[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -455,6 +462,23 @@ model AdView {
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([adId, createdAt])
+}
+
+/// I9 — Trace les révélations de numéro WhatsApp.
+/// Utilisé pour : rate limit gratuit (3/jour pour CLIENT sans Pass Premium),
+/// analytics escort, anti-spam.
+model NumberReveal {
+  id        String   @id @default(cuid())
+  userId    String?
+  adId      String
+  ipHash    String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ad   Ad    @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([adId])
 }
 
 // =====================================================================

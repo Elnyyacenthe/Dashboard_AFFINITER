@@ -447,6 +447,7 @@ export async function initiateWithdrawalAction(input: {
 export async function payTierFromWalletAction(input: {
   adId?: string;     // si on boost une annonce existante
   tier: "PREMIUM" | "VIP" | "DIAMOND";
+  autoRenew?: boolean;  // I5 — active l'auto-renouvellement à l'achat
 }): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Non authentifié" };
@@ -527,6 +528,7 @@ export async function payTierFromWalletAction(input: {
       data: {
         tier,
         promotedUntil: new Date(Date.now() + days * 86_400_000),
+        ...(input.autoRenew !== undefined && { autoRenew: input.autoRenew }),
       },
     });
   }

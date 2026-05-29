@@ -21,9 +21,13 @@ export default async function AccountPage({ backUrl = "/compte" }: { backUrl?: s
   });
   if (!user) redirect("/connexion");
 
+  // Pour les ADMIN/MODERATOR, lien externe vers yamo.cm/admin (cf. dashboard-namespace.ts)
+  const yamoAdminUrl =
+    process.env.NEXT_PUBLIC_YAMO_ADMIN_URL ??
+    `${process.env.NEXT_PUBLIC_YAMO_URL ?? "https://yamo.cm"}/admin`;
   const dashboardLink =
     user.role === "ADMIN" || user.role === "MODERATOR"
-      ? "/admin"
+      ? yamoAdminUrl
       : user.role === "ESCORT"
         ? "/escort/dashboard"
         : "/client";

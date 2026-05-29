@@ -136,9 +136,16 @@ export async function Header() {
                     )}
                     {(user.role === "ADMIN" || user.role === "MODERATOR") && (
                       <DropdownMenuItem asChild>
-                        <Link href="/admin">
-                          <Shield className="h-4 w-4" /> Administration
-                        </Link>
+                        <a
+                          href={
+                            process.env.NEXT_PUBLIC_YAMO_ADMIN_URL ??
+                            `${process.env.NEXT_PUBLIC_YAMO_URL ?? "https://yamo.cm"}/admin`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Shield className="h-4 w-4" /> Administration ↗
+                        </a>
                       </DropdownMenuItem>
                     )}
                     {ns && (

@@ -16,34 +16,24 @@ export const authConfig = {
       const isLoggedIn = !!auth?.user;
       const role = auth?.user?.role;
 
-      const isOnAdmin = nextUrl.pathname.startsWith("/admin");
+      // Ce dashboard ne contient PAS l'interface admin. Les ADMIN/MODERATOR
+      // sont renvoyés sur la home (`/`) qui les redirige vers yamo.cm/admin externe.
       const isOnEscort = nextUrl.pathname.startsWith("/escort");
       const isOnClient = nextUrl.pathname.startsWith("/client");
-      const isOnPost = nextUrl.pathname.startsWith("/poster-une-annonce");
       const isOnAuth =
         nextUrl.pathname.startsWith("/connexion") || nextUrl.pathname.startsWith("/inscription");
 
-      if (isOnAdmin) {
-        return isLoggedIn && (role === "ADMIN" || role === "MODERATOR");
-      }
       if (isOnEscort) {
-        return isLoggedIn && (role === "ESCORT" || role === "ADMIN");
+        return isLoggedIn && role === "ESCORT";
       }
       if (isOnClient) {
-        // Tout utilisateur connecté peut accéder à /client/* — l'escort peut aussi
-        // si elle veut consulter son côté "spectateur"
-        return isLoggedIn;
-      }
-      if (isOnPost) {
+        // Tout utilisateur connecté peut accéder à /client/*
         return isLoggedIn;
       }
       if (isOnAuth && isLoggedIn) {
+        // ADMIN/MODERATOR : renvoyés vers `/` qui redirigera vers l'admin externe
         const dest =
-          role === "ADMIN" || role === "MODERATOR"
-            ? "/admin"
-            : role === "ESCORT"
-              ? "/escort/dashboard"
-              : "/client";
+          role === "ESCORT" ? "/escort/dashboard" : role === "CLIENT" ? "/client" : "/";
         return Response.redirect(new URL(dest, nextUrl));
       }
       return true;

@@ -1,14 +1,13 @@
 # Yamo Dashboard
 
-Interface back-office de la plateforme [Yamo](https://github.com/Elnyyacenthe/YAMO) — espace réservé aux **escorts**, **clients**, **modérateurs** et **administrateurs**.
+Espace utilisateur (**escort** + **client**) de la plateforme [Yamo](https://github.com/Elnyyacenthe/YAMO).
 
-> ⚠️ Cette appli partage la **même base de données Supabase** et la **même config Auth.js** que le site public `yamo.cm`. Les deux projets sont déployables séparément (par exemple sur deux sous-domaines : `yamo.cm` et `dashboard.yamo.cm`).
+> ⚠️ Cette appli partage la **même base de données Supabase** et la **même config Auth.js** que le site public `yamo.cm`. Les trois projets (yamo public / yamo-dashboard / admin) sont déployables séparément.
 
 ## 🎯 Ce que cette appli contient
 
 | Espace | Routes | Pour qui |
 |--------|--------|----------|
-| **Admin** | `/admin/*` | ADMIN + MODERATOR — modération, utilisateurs, paiements, tarifs, signalements |
 | **Escort** | `/escort/*` | ESCORT — dashboard, annonces, profil, vérification KYC, statistiques, portefeuille, parrainage |
 | **Client** | `/client/*` | CLIENT — favoris, portefeuille, parrainage, compte, **devenir escort** |
 | **Auth** | `/connexion`, `/inscription` | Tous |
@@ -16,7 +15,8 @@ Interface back-office de la plateforme [Yamo](https://github.com/Elnyyacenthe/YA
 
 ## 🚫 Ce que cette appli ne contient PAS
 
-Les pages marketing (home, recherche, annonce, ville, poster, tarifs, contact) sont dans le projet principal [Yamo](https://github.com/Elnyyacenthe/YAMO). Ce dashboard redirige automatiquement `/` vers le bon namespace selon le rôle.
+- **Pages marketing** (home, recherche, annonce, ville, poster, tarifs, contact) → restent dans [Yamo principal](https://github.com/Elnyyacenthe/YAMO)
+- **Interface ADMIN** (modération, utilisateurs, paiements, tarifs, KYC validation, signalements, villes, retraits, statistiques globales) → externe (`yamo.cm/admin` ou app admin dédiée). Si un ADMIN/MODERATOR se connecte ici, il est automatiquement redirigé vers `NEXT_PUBLIC_YAMO_ADMIN_URL`.
 
 ## 🛠️ Stack technique
 
@@ -67,6 +67,9 @@ NEXT_PUBLIC_APP_NAME="Yamo"
 
 # URL du site public (utilisée pour les liens "Voir sur yamo.cm")
 NEXT_PUBLIC_YAMO_URL="https://yamo.cm"
+
+# URL de l'interface admin externe (si vide → NEXT_PUBLIC_YAMO_URL + "/admin")
+NEXT_PUBLIC_YAMO_ADMIN_URL=""
 ```
 
 ## 🗄️ Base de données
@@ -119,11 +122,12 @@ Les sessions Auth.js sont partagées si :
 src/app/
 ├── (auth)/           Connexion, inscription
 ├── (public)/         Pages légales + redirects (vers /client ou /escort)
-├── admin/            Dashboard ADMIN (modération, tarifs, paiements…)
 ├── escort/           Dashboard ESCORT (annonces, KYC, premium, wallet…)
 ├── client/           Dashboard CLIENT (favoris, wallet, devenir escort…)
 └── api/              Webhooks K-Pay, uploadthing, auth
 ```
+
+> Les ADMIN/MODERATOR sont automatiquement redirigés vers `NEXT_PUBLIC_YAMO_ADMIN_URL` (par défaut : `https://yamo.cm/admin`).
 
 ## 🔗 Liens utiles
 

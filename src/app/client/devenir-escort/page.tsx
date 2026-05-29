@@ -19,9 +19,15 @@ export default async function BecomeEscortPage() {
   const session = await auth();
   if (!session?.user) redirect("/connexion?callbackUrl=/client/devenir-escort");
 
-  // Si déjà escort ou admin, on les renvoie chez eux
+  // Si déjà escort, on l'envoie sur son dashboard
   if (session.user.role === "ESCORT") redirect("/escort/dashboard");
-  if (session.user.role === "ADMIN" || session.user.role === "MODERATOR") redirect("/admin");
+  // ADMIN/MODERATOR : renvoyés vers l'interface admin externe (yamo.cm/admin)
+  if (session.user.role === "ADMIN" || session.user.role === "MODERATOR") {
+    const url =
+      process.env.NEXT_PUBLIC_YAMO_ADMIN_URL ??
+      `${process.env.NEXT_PUBLIC_YAMO_URL ?? "https://yamo.cm"}/admin`;
+    redirect(url);
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">

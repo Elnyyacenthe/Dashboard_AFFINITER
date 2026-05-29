@@ -1,0 +1,554 @@
+// Yamo — Plateforme d'annonces d'escorts au Cameroun
+// Schéma Prisma complet : utilisateurs, profils escorts, annonces, villes,
+// paiements, signalements, médias, sessions Auth.js, wallet, MoMo, parrainage.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =====================================================================
+// ENUMS
+// =====================================================================
+
+enum Role {
+  ADMIN
+  ESCORT
+  CLIENT
+  MODERATOR
+}
+
+enum AdStatus {
+  DRAFT
+  PENDING
+  ACTIVE
+  REJECTED
+  PAUSED
+  EXPIRED
+  BANNED
+}
+
+enum AdTier {
+  STANDARD
+  PREMIUM
+  VIP
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  TRANS
+  COUPLE
+}
+
+enum Orientation {
+  HETERO
+  BI
+  GAY
+  LESBIAN
+  OTHER
+}
+
+enum BodyType {
+  SLIM
+  ATHLETIC
+  CURVY
+  BBW
+  AVERAGE
+}
+
+enum HairColor {
+  BLACK
+  BROWN
+  BLONDE
+  RED
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  MTN_MOMO
+  ORANGE_MONEY
+  CARD
+  MANUAL
+  WALLET
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportReason {
+  FAKE
+  SCAM
+  UNDERAGE
+  ILLEGAL
+  SPAM
+  HARASSMENT
+  OTHER
+}
+
+enum MediaType {
+  PHOTO
+  VIDEO
+}
+
+enum VerificationStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum TxType {
+  DEPOSIT          // Crédit du wallet via MoMo/Orange
+  WITHDRAWAL       // Retrait vers MoMo/Orange
+  BOOST_PAYMENT    // Achat tier Premium/VIP
+  REFERRAL_BONUS   // Bonus parrainage
+  REFUND           // Remboursement admin
+  ADJUSTMENT       // Ajustement manuel admin
+}
+
+enum TxStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum IdDocType {
+  CNI
+  PASSPORT
+  DRIVING_LICENSE
+}
+
+// =====================================================================
+// AUTH (NextAuth v5 / Auth.js)
+// =====================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  email         String?   @unique
+  emailVerified DateTime?
+  phone         String?   @unique
+  phoneVerified DateTime?
+  password      String?
+  name          String?
+  image         String?
+  role          Role      @default(CLIENT)
+  isBanned      Boolean   @default(false)
+  banReason     String?
+  lastLoginAt   DateTime?
+
+  // === Wallet & Parrainage ===
+  walletBalance     Int       @default(0)          // Solde en FCFA
+  referralCode      String?   @unique               // Code parrainage unique YAMO-XXXX
+  referredById      String?                          // Qui m'a parrainé
+  referredBy        User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals         User[]    @relation("Referrals")
+  referralBonusGiven Int      @default(0)           // Total des bonus reversés à ce user (parrain)
+
+  // === Anti-réinscription après suppression ===
+  identityHash      String?                          // SHA-256 du numéro d'ID — permet de bannir définitivement
+
+  accounts          Account[]
+  sessions          Session[]
+  escortProfile     EscortProfile?
+  ads               Ad[]              @relation("AdOwner")
+  payments          Payment[]
+  reportsMade       Report[]          @relation("Reporter")
+  reportsAgainst    Report[]          @relation("Reported")
+  favorites         Favorite[]
+  views             AdView[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  walletTxs         WalletTransaction[]
+  idVerifications   IdVerification[]
+  reviewedVerifs    IdVerification[]   @relation("VerifReviewer")
+  withdrawalRequests WithdrawalRequest[] @relation("WithdrawalOwner")
+  approvedWithdrawals WithdrawalRequest[] @relation("WithdrawalApprover")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role])
+  @@index([email])
+  @@index([phone])
+  @@index([referralCode])
+  @@index([referredById])
+  @@index([identityHash])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// =====================================================================
+// CONTENU MÉTIER
+// =====================================================================
+
+model City {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  slug        String  @unique
+  region      String?
+  population  Int?
+  imageUrl    String?
+  description String? @db.Text
+  isPopular   Boolean @default(false)
+  order       Int     @default(0)
+
+  ads Ad[]
+
+  createdAt DateTime @default(now())
+
+  @@index([slug])
+  @@index([isPopular])
+}
+
+model EscortProfile {
+  id            String              @id @default(cuid())
+  userId        String              @unique
+  displayName   String
+  slug          String              @unique
+  bio           String?             @db.Text
+  age           Int
+  gender        Gender              @default(FEMALE)
+  orientation   Orientation         @default(HETERO)
+  bodyType      BodyType?
+  hairColor     HairColor?
+  height        Int?
+  weight        Int?
+  ethnicity     String?
+  languages     String[]            @default([])
+  isVerified    Boolean             @default(false)
+  verification  VerificationStatus  @default(NONE)
+  verifiedAt    DateTime?
+  rating        Float               @default(0)
+  totalViews    Int                 @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ads  Ad[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+  @@index([isVerified])
+}
+
+model Ad {
+  id              String   @id @default(cuid())
+  ownerId         String
+  profileId       String?
+  cityId          String
+  title           String
+  slug            String   @unique
+  description     String   @db.Text
+  price           Int
+  priceNight      Int?
+  whatsappPhone   String
+  callPhone       String?
+  status          AdStatus @default(PENDING)
+  tier            AdTier   @default(STANDARD)
+  services        String[] @default([])
+  outcall         Boolean  @default(false)
+  incall          Boolean  @default(true)
+  neighborhood    String?
+  views           Int      @default(0)
+  whatsappClicks  Int      @default(0)
+  rejectionReason String?
+  expiresAt       DateTime?
+  promotedUntil   DateTime?
+  publishedAt     DateTime?
+
+  owner     User            @relation("AdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  profile   EscortProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  city      City            @relation(fields: [cityId], references: [id])
+  media     Media[]
+  reports   Report[]
+  favorites Favorite[]
+  viewsLog  AdView[]
+  payments  Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, tier, publishedAt])
+  @@index([cityId, status])
+  @@index([ownerId])
+  @@index([slug])
+}
+
+model Media {
+  id              String    @id @default(cuid())
+  adId            String
+  url             String
+  thumbUrl        String?
+  type            MediaType @default(PHOTO)
+  width           Int?
+  height          Int?
+  position        Int       @default(0)
+  isPrimary       Boolean   @default(false)
+  isApproved      Boolean   @default(false)
+  rejectionReason String?
+  nsfwScore       Float?
+
+  ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([adId, position])
+}
+
+model Favorite {
+  id     String @id @default(cuid())
+  userId String
+  adId   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ad   Ad   @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, adId])
+  @@index([userId])
+}
+
+model AdView {
+  id        String   @id @default(cuid())
+  adId      String
+  userId    String?
+  ipHash    String?
+  userAgent String?
+  referer   String?
+  createdAt DateTime @default(now())
+
+  ad   Ad    @relation(fields: [adId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([adId, createdAt])
+}
+
+// =====================================================================
+// PAIEMENTS & WALLET
+// =====================================================================
+
+model Payment {
+  id            String          @id @default(cuid())
+  userId        String
+  adId          String?
+  amount        Int
+  currency      String          @default("XAF")
+  provider      PaymentProvider
+  providerRef   String?         @unique
+  status        PaymentStatus   @default(PENDING)
+  tier          AdTier?
+  durationDays  Int?
+  metadata      Json?
+  paidAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+  ad   Ad?  @relation(fields: [adId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([adId])
+}
+
+model WalletTransaction {
+  id            String   @id @default(cuid())
+  userId        String
+  amount        Int      // Positif = crédit ; négatif = débit
+  balanceBefore Int
+  balanceAfter  Int
+  type          TxType
+  status        TxStatus @default(COMPLETED)
+  reference     String?  // Référence externe (TX MoMo, Payment.id…)
+  description   String?
+  metadata      Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, status])
+}
+
+/// Demande de retrait — admin valide manuellement OU disbursement auto MoMo.
+model WithdrawalRequest {
+  id           String          @id @default(cuid())
+  userId       String
+  amount       Int             // FCFA à retirer
+  provider     PaymentProvider // MTN_MOMO ou ORANGE_MONEY
+  destinationPhone String      // Numéro destinataire
+  status       PaymentStatus   @default(PENDING)
+  providerRef  String?
+  approvedById String?
+  approvedAt   DateTime?
+  failureReason String?
+
+  user       User @relation("WithdrawalOwner", fields: [userId], references: [id], onDelete: Cascade)
+  approvedBy User? @relation("WithdrawalApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+// =====================================================================
+// VÉRIFICATION D'IDENTITÉ
+// =====================================================================
+
+model IdVerification {
+  id              String             @id @default(cuid())
+  userId          String
+  documentType    IdDocType
+  documentNumber  String             // Hash SHA-256 — NE PAS stocker en clair
+  documentFrontUrl String
+  documentBackUrl String?
+  selfieUrl       String
+  status          VerificationStatus @default(PENDING)
+  rejectionReason String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("VerifReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// Identités définitivement bannies du site — bloque toute réinscription.
+model BlockedIdentity {
+  id           String   @id @default(cuid())
+  identityHash String   @unique
+  reason       String
+  bannedById   String
+  createdAt    DateTime @default(now())
+
+  @@index([identityHash])
+}
+
+// =====================================================================
+// SIGNALEMENTS / NOTIFS / AUDIT
+// =====================================================================
+
+model Report {
+  id             String       @id @default(cuid())
+  reporterId     String?
+  reportedUserId String?
+  adId           String?
+  reason         ReportReason
+  details        String?      @db.Text
+  status         ReportStatus @default(OPEN)
+  resolvedAt     DateTime?
+  resolution     String?      @db.Text
+
+  reporter     User? @relation("Reporter", fields: [reporterId], references: [id], onDelete: SetNull)
+  reportedUser User? @relation("Reported", fields: [reportedUserId], references: [id], onDelete: SetNull)
+  ad           Ad?   @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([adId])
+}
+
+model Notification {
+  id     String  @id @default(cuid())
+  userId String
+  title  String
+  body   String  @db.Text
+  link   String?
+  read   Boolean @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+}
+
+// =====================================================================
+// CONFIG SITE — tarifs et options dynamiques
+// =====================================================================
+
+model SiteSetting {
+  key       String @id
+  value     String @db.Text
+  category  String @default("general") // "pricing" | "referral" | "limits"…
+  label     String?
+  updatedAt DateTime @updatedAt
+
+  @@index([category])
+}

@@ -1,0 +1,230 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import type { AdStatus, AdTier, ReportStatus, Role } from "@prisma/client";
+
+import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+
+async function requireAdmin() {
+  const session = await auth();
+  if (!session?.user || (session.user.role !== "ADMIN" && session.user.role !== "MODERATOR")) {
+    throw new Error("Non autorisé");
+  }
+  return session.user;
+}
+
+/** Approuve une annonce en modération. */
+export async function approveAdAction(adId: string) {
+  const admin = await requireAdmin();
+  await prisma.$transaction([
+    prisma.ad.update({
+      where: { id: adId },
+      data: {
+        status: "ACTIVE",
+        publishedAt: new Date(),
+        rejectionReason: null,
+        media: { updateMany: { where: { adId }, data: { isApproved: true } } },
+      },
+    }),
+    prisma.auditLog.create({
+      data: { actorId: admin.id, action: "AD_APPROVED", entity: "Ad", entityId: adId },
+    }),
+  ]);
+  revalidatePath("/admin/moderation");
+  revalidatePath("/");
+}
+
+export async function rejectAdAction(adId: string, reason: string) {
+  const admin = await requireAdmin();
+  await prisma.$transaction([
+    prisma.ad.update({
+      where: { id: adId },
+      data: { status: "REJECTED", rejectionReason: reason },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "AD_REJECTED",
+        entity: "Ad",
+        entityId: adId,
+        metadata: { reason },
+      },
+    }),
+  ]);
+  revalidatePath("/admin/moderation");
+}
+
+export async function banAdAction(adId: string, reason: string) {
+  const admin = await requireAdmin();
+  await prisma.$transaction([
+    prisma.ad.update({ where: { id: adId }, data: { status: "BANNED", rejectionReason: reason } }),
+    prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "AD_BANNED",
+        entity: "Ad",
+        entityId: adId,
+        metadata: { reason },
+      },
+    }),
+  ]);
+  revalidatePath("/admin/annonces");
+}
+
+export async function setAdTierAction(adId: string, tier: AdTier, days: number = 30) {
+  await requireAdmin();
+  const promotedUntil = new Date(Date.now() + days * 86_400_000);
+  await prisma.ad.update({
+    where: { id: adId },
+    data: {
+      tier,
+      promotedUntil: tier === "STANDARD" ? null : promotedUntil,
+    },
+  });
+  revalidatePath("/admin/annonces");
+}
+
+/** Bannit ou débannit un utilisateur. */
+export async function toggleUserBanAction(userId: string, reason?: string) {
+  const admin = await requireAdmin();
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new Error("Utilisateur introuvable");
+  const next = !user.isBanned;
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { isBanned: next, banReason: next ? reason ?? null : null },
+    }),
+    next
+      ? prisma.ad.updateMany({
+          where: { ownerId: userId, status: { in: ["ACTIVE", "PENDING"] } },
+          data: { status: "BANNED" },
+        })
+      : prisma.ad.updateMany({
+          where: { ownerId: userId, status: "BANNED" },
+          data: { status: "PAUSED" },
+        }),
+    prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: next ? "USER_BANNED" : "USER_UNBANNED",
+        entity: "User",
+        entityId: userId,
+        metadata: { reason },
+      },
+    }),
+  ]);
+  revalidatePath("/admin/utilisateurs");
+}
+
+export async function setUserRoleAction(userId: string, role: Role) {
+  const admin = await requireAdmin();
+  if (admin.role !== "ADMIN") throw new Error("Réservé aux admins");
+  await prisma.user.update({ where: { id: userId }, data: { role } });
+  await prisma.auditLog.create({
+    data: { actorId: admin.id, action: "USER_ROLE_CHANGED", entity: "User", entityId: userId, metadata: { role } },
+  });
+  revalidatePath("/admin/utilisateurs");
+}
+
+export async function setProfileVerifiedAction(profileId: string, verified: boolean) {
+  const admin = await requireAdmin();
+  await prisma.escortProfile.update({
+    where: { id: profileId },
+    data: {
+      isVerified: verified,
+      verification: verified ? "VERIFIED" : "REJECTED",
+      verifiedAt: verified ? new Date() : null,
+    },
+  });
+  await prisma.auditLog.create({
+    data: {
+      actorId: admin.id,
+      action: verified ? "PROFILE_VERIFIED" : "PROFILE_UNVERIFIED",
+      entity: "EscortProfile",
+      entityId: profileId,
+    },
+  });
+  revalidatePath("/admin/utilisateurs");
+}
+
+/** Modération photos — approuver / refuser une photo individuelle. */
+export async function approveMediaAction(mediaId: string) {
+  await requireAdmin();
+  await prisma.media.update({
+    where: { id: mediaId },
+    data: { isApproved: true, rejectionReason: null },
+  });
+  revalidatePath("/admin/moderation");
+}
+
+export async function rejectMediaAction(mediaId: string, reason: string) {
+  await requireAdmin();
+  await prisma.media.update({
+    where: { id: mediaId },
+    data: { isApproved: false, rejectionReason: reason },
+  });
+  revalidatePath("/admin/moderation");
+}
+
+/** Résoudre / rejeter un signalement. */
+export async function resolveReportAction(
+  reportId: string,
+  status: Extract<ReportStatus, "RESOLVED" | "DISMISSED">,
+  resolution?: string,
+) {
+  const admin = await requireAdmin();
+  await prisma.report.update({
+    where: { id: reportId },
+    data: { status, resolution, resolvedAt: new Date() },
+  });
+  await prisma.auditLog.create({
+    data: {
+      actorId: admin.id,
+      action: `REPORT_${status}`,
+      entity: "Report",
+      entityId: reportId,
+      metadata: { resolution },
+    },
+  });
+  revalidatePath("/admin/signalements");
+}
+
+/** Validation manuelle d'un paiement. */
+export async function markPaymentPaidAction(paymentId: string) {
+  const admin = await requireAdmin();
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!payment) throw new Error("Paiement introuvable");
+
+  await prisma.$transaction([
+    prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: "PAID", paidAt: new Date() },
+    }),
+    // Si paiement lié à une annonce, on applique le tier
+    ...(payment.adId && payment.tier
+      ? [
+          prisma.ad.update({
+            where: { id: payment.adId },
+            data: {
+              tier: payment.tier,
+              promotedUntil: new Date(
+                Date.now() + (payment.durationDays ?? 30) * 86_400_000,
+              ),
+            },
+          }),
+        ]
+      : []),
+    prisma.auditLog.create({
+      data: {
+        actorId: admin.id,
+        action: "PAYMENT_MARKED_PAID",
+        entity: "Payment",
+        entityId: paymentId,
+      },
+    }),
+  ]);
+  revalidatePath("/admin/paiements");
+}

@@ -36,6 +36,23 @@ enum AdTier {
   STANDARD
   PREMIUM
   VIP
+  DIAMOND
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_USER
+  CLOSED
+}
+
+enum TicketCategory {
+  GENERAL
+  PAYMENT
+  MODERATION
+  KYC
+  BUG
+  OTHER
 }
 
 enum Gender {
@@ -180,6 +197,8 @@ model User {
   reviewedVerifs    IdVerification[]   @relation("VerifReviewer")
   withdrawalRequests WithdrawalRequest[] @relation("WithdrawalOwner")
   approvedWithdrawals WithdrawalRequest[] @relation("WithdrawalApprover")
+  supportTickets   SupportTicket[]
+  supportMessages  SupportMessage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -243,6 +262,40 @@ model OtpCode {
 
   @@index([phone, purpose])
   @@index([expiresAt])
+}
+
+/// Ticket de service client (I12).
+/// Un utilisateur authentifié peut créer un ticket, l'admin répond, l'historique
+/// reste consultable des deux côtés.
+model SupportTicket {
+  id        String          @id @default(cuid())
+  userId    String
+  subject   String
+  category  TicketCategory  @default(GENERAL)
+  status    TicketStatus    @default(OPEN)
+
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  SupportMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status, updatedAt(sort: Desc)])
+}
+
+model SupportMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String   @db.Text
+  isAdmin   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
 }
 
 // =====================================================================
@@ -327,6 +380,8 @@ model Ad {
   lastBumpedAt    DateTime?
   stickyUntil     DateTime?
   bumpCount       Int      @default(0)
+  // Phase 2B — Auto-renewal opt-in
+  autoRenew       Boolean  @default(false)
 
   owner     User            @relation("AdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   profile   EscortProfile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
@@ -361,12 +416,16 @@ model Media {
   isApproved      Boolean   @default(false)
   rejectionReason String?
   nsfwScore       Float?
+  // Phase 2B — Photos service (payantes par publication)
+  isServicePhoto  Boolean   @default(false)
+  paymentId       String?
 
   ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([adId, position])
+  @@index([isServicePhoto])
 }
 
 model Favorite {

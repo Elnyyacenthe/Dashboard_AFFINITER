@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatXAF, timeAgo } from "@/lib/utils";
-import { ToggleAdButton, DeleteAdButton, BumpAdButton, StickyAdButton } from "./_components/ad-actions";
+import { ToggleAdButton, DeleteAdButton, BumpAdButton, StickyAdButton, AutoRenewToggle } from "./_components/ad-actions";
 import { getSettingNumber } from "@/lib/actions/wallet";
 
 const STATUS_LABEL: Record<string, { label: string; variant: "secondary" | "success" | "destructive" | "outline" }> = {
@@ -114,6 +114,9 @@ export default async function MyAdsPage() {
                       <>
                         <BumpAdButton adId={ad.id} price={bumpPrice} />
                         <StickyAdButton adId={ad.id} price={stickyPrice} />
+                        {ad.tier !== "STANDARD" && (
+                          <AutoRenewToggle adId={ad.id} initial={ad.autoRenew} />
+                        )}
                       </>
                     )}
                     {(ad.status === "ACTIVE" || ad.status === "PAUSED") && (

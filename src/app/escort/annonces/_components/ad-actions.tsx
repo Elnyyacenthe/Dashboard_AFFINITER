@@ -1,12 +1,12 @@
 "use client";
 
-import { useTransition } from "react";
-import { Pause, Play, Trash2, Loader2, ArrowUp, Pin } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Pause, Play, Trash2, Loader2, ArrowUp, Pin, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { toggleAdStatusAction, deleteAdAction } from "@/lib/actions/ads";
-import { bumpAdAction, stickyAdAction } from "@/lib/actions/wallet";
+import { bumpAdAction, stickyAdAction, setAutoRenewAction } from "@/lib/actions/wallet";
 
 export function ToggleAdButton({ adId, isActive }: { adId: string; isActive: boolean }) {
   const [pending, startTransition] = useTransition();
@@ -110,6 +110,49 @@ export function StickyAdButton({ adId, price = 2000 }: { adId: string; price?: n
     >
       {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pin className="h-4 w-4" />}
       Sticky 24h
+    </Button>
+  );
+}
+
+/**
+ * Toggle Auto-renewal.
+ * Si activé, l'annonce sera renouvelée automatiquement avant expiration
+ * (cron auto-renew). Si solde insuffisant, l'escort reçoit une notif.
+ */
+export function AutoRenewToggle({
+  adId,
+  initial,
+}: {
+  adId: string;
+  initial: boolean;
+}) {
+  const [enabled, setEnabled] = useState(initial);
+  const [pending, startTransition] = useTransition();
+
+  function toggle() {
+    const next = !enabled;
+    setEnabled(next); // optimistic
+    startTransition(async () => {
+      const res = await setAutoRenewAction({ adId, enabled: next });
+      if (res.ok) {
+        toast.success(next ? "Auto-renouvellement activé ♻️" : "Auto-renouvellement désactivé");
+      } else {
+        setEnabled(!next); // rollback
+        toast.error(res.error);
+      }
+    });
+  }
+
+  return (
+    <Button
+      variant={enabled ? "default" : "outline"}
+      size="sm"
+      disabled={pending}
+      onClick={toggle}
+      title="Renouvelle automatiquement le boost à expiration (solde wallet requis)"
+    >
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+      {enabled ? "Auto-renew ON" : "Auto-renew OFF"}
     </Button>
   );
 }

@@ -446,15 +446,48 @@ export async function initiateWithdrawalAction(input: {
 
 export async function payTierFromWalletAction(input: {
   adId?: string;     // si on boost une annonce existante
-  tier: "PREMIUM" | "VIP";
+  tier: "PREMIUM" | "VIP" | "DIAMOND";
 }): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Non authentifié" };
 
   const tier = input.tier;
-  const priceKey = tier === "VIP" ? "pricing.vip.amount" : "pricing.premium.amount";
-  const daysKey = tier === "VIP" ? "pricing.vip.days" : "pricing.premium.days";
-  const price = await getSettingNumber(priceKey, tier === "VIP" ? 15000 : 5000);
+
+  // I3 — Diamond : scarcité 1 slot par ville
+  if (tier === "DIAMOND" && input.adId) {
+    const ad = await prisma.ad.findUnique({
+      where: { id: input.adId },
+      select: { cityId: true, city: { select: { name: true } } },
+    });
+    if (ad) {
+      const existing = await prisma.ad.findFirst({
+        where: {
+          cityId: ad.cityId,
+          tier: "DIAMOND",
+          promotedUntil: { gt: new Date() },
+          NOT: { id: input.adId },
+        },
+        select: { id: true },
+      });
+      if (existing) {
+        return {
+          ok: false,
+          error: `Le slot DIAMOND de ${ad.city.name} est déjà pris. Attendez l'expiration ou choisissez VIP.`,
+        };
+      }
+    }
+  }
+
+  const priceKey =
+    tier === "DIAMOND" ? "pricing.diamond.amount"
+    : tier === "VIP" ? "pricing.vip.amount"
+    : "pricing.premium.amount";
+  const daysKey =
+    tier === "DIAMOND" ? "pricing.diamond.days"
+    : tier === "VIP" ? "pricing.vip.days"
+    : "pricing.premium.days";
+  const fallbackPrice = tier === "DIAMOND" ? 50000 : tier === "VIP" ? 15000 : 5000;
+  const price = await getSettingNumber(priceKey, fallbackPrice);
   const days = await getSettingNumber(daysKey, 30);
 
   // Débit wallet
@@ -761,9 +794,117 @@ export async function getSettingNumber(key: string, fallback: number): Promise<n
 
 /**
  * Cap photos selon le tier d'une annonce (ou DRAFT/PENDING → cap Standard).
+ * DIAMOND = illimité (cap virtuel à 100 pour éviter UI bug).
  */
-export async function getPhotoCapForTier(tier: "STANDARD" | "PREMIUM" | "VIP"): Promise<number> {
+export async function getPhotoCapForTier(
+  tier: "STANDARD" | "PREMIUM" | "VIP" | "DIAMOND",
+): Promise<number> {
+  if (tier === "DIAMOND") return getSettingNumber("photos.cap.diamond", 100);
   if (tier === "VIP") return getSettingNumber("photos.cap.vip", 15);
   if (tier === "PREMIUM") return getSettingNumber("photos.cap.premium", 5);
   return getSettingNumber("photos.cap.standard", 3);
+}
+
+// =====================================================================
+// PHASE 2B — I4 PHOTO SERVICE (pay-per-publication)
+// =====================================================================
+
+/**
+ * Ajoute une "photo service" payante à une annonce existante.
+ * Débit immédiat du wallet (300 FCFA par défaut, configurable).
+ *
+ * Différence avec une photo profil :
+ *   - "Photo profil" : incluse dans l'abonnement (limitée par tier)
+ *   - "Photo service" : illimitée mais 300 FCFA / publication
+ *
+ * Modération : la photo est isApproved=false en attendant validation admin.
+ */
+export async function addServicePhotoAction(input: {
+  adId: string;
+  url: string;
+}): Promise<{ ok: true; mediaId: string; charged: number } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Non authentifié" };
+
+  const ad = await prisma.ad.findUnique({
+    where: { id: input.adId },
+    select: { id: true, ownerId: true, status: true, title: true },
+  });
+  if (!ad) return { ok: false, error: "Annonce introuvable" };
+  if (ad.ownerId !== session.user.id) return { ok: false, error: "Non autorisé" };
+
+  const price = await getSettingNumber("pricing.servicePhoto.amount", 300);
+
+  // Débit wallet
+  try {
+    await applyWalletDelta({
+      userId: session.user.id,
+      amount: -price,
+      type: "BOOST_PAYMENT",
+      description: `Photo service ajoutée à "${ad.title}"`,
+      reference: `svcphoto_${input.adId}_${Date.now()}`,
+      metadata: { adId: input.adId, type: "SERVICE_PHOTO" },
+    });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Solde insuffisant" };
+  }
+
+  // Création du payment record + media
+  const payment = await prisma.payment.create({
+    data: {
+      userId: session.user.id,
+      adId: input.adId,
+      amount: price,
+      provider: "WALLET",
+      status: "PAID",
+      paidAt: new Date(),
+      metadata: { type: "SERVICE_PHOTO" },
+    },
+  });
+
+  const position = await prisma.media.count({ where: { adId: input.adId } });
+  const media = await prisma.media.create({
+    data: {
+      adId: input.adId,
+      url: input.url,
+      type: "PHOTO",
+      isServicePhoto: true,
+      isApproved: false,
+      paymentId: payment.id,
+      position,
+    },
+  });
+
+  await maybeReferralBonusOnPayment(session.user.id, price);
+
+  revalidatePath(`/escort/annonces/${input.adId}`);
+  return { ok: true, mediaId: media.id, charged: price };
+}
+
+// =====================================================================
+// PHASE 2B — I5 AUTO-RENEWAL : toggle opt-in
+// =====================================================================
+
+export async function setAutoRenewAction(input: {
+  adId: string;
+  enabled: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const session = await auth();
+  if (!session?.user) return { ok: false, error: "Non authentifié" };
+
+  const ad = await prisma.ad.findUnique({
+    where: { id: input.adId },
+    select: { ownerId: true },
+  });
+  if (!ad || ad.ownerId !== session.user.id) {
+    return { ok: false, error: "Annonce introuvable" };
+  }
+
+  await prisma.ad.update({
+    where: { id: input.adId },
+    data: { autoRenew: input.enabled },
+  });
+
+  revalidatePath("/escort/annonces");
+  return { ok: true };
 }

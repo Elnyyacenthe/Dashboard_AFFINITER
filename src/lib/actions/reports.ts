@@ -16,7 +16,7 @@ const reportSchema = z.object({
 export async function reportAdAction(input: z.infer<typeof reportSchema>) {
   const session = await auth();
   const ip = (await headers()).get("x-forwarded-for") ?? session?.user?.id ?? "anon";
-  const rl = rateLimit(`report:${ip}`, RL.report);
+  const rl = await rateLimit(`report:${ip}`, RL.report);
   if (!rl.success) return { ok: false as const, error: "Trop de signalements. Réessayez plus tard." };
 
   const parsed = reportSchema.safeParse(input);

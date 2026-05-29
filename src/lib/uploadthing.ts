@@ -14,7 +14,7 @@ export const ourFileRouter = {
     .middleware(async () => {
       const session = await auth();
       if (!session?.user) throw new UploadThingError("Non authentifié");
-      const rl = rateLimit(`upload:${session.user.id}`, RL.upload);
+      const rl = await rateLimit(`upload:${session.user.id}`, RL.upload);
       if (!rl.success) throw new UploadThingError("Limite d'upload atteinte");
       return { userId: session.user.id };
     })
@@ -29,7 +29,7 @@ export const ourFileRouter = {
     .middleware(async () => {
       const session = await auth();
       if (!session?.user) throw new UploadThingError("Non authentifié");
-      const rl = rateLimit(`upload-vid:${session.user.id}`, { limit: 5, windowMs: 60_000 });
+      const rl = await rateLimit(`upload-vid:${session.user.id}`, { limit: 5, windowMs: 60_000 });
       if (!rl.success) throw new UploadThingError("Limite d'upload vidéo atteinte");
       return { userId: session.user.id };
     })

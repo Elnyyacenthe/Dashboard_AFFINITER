@@ -227,6 +227,24 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+/// OTP envoyés par SMS pour vérification de téléphone, retrait sécurisé, 2FA.
+/// Le code lui-même n'est jamais stocké en clair — seul un hash SHA-256.
+model OtpCode {
+  id        String    @id @default(cuid())
+  userId    String?
+  phone     String
+  codeHash  String
+  /// SIGNUP_PHONE_VERIFY | WITHDRAWAL_CONFIRM | LOGIN_2FA
+  purpose   String
+  attempts  Int       @default(0)
+  consumed  Boolean   @default(false)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([phone, purpose])
+  @@index([expiresAt])
+}
+
 // =====================================================================
 // CONTENU MÉTIER
 // =====================================================================

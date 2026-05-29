@@ -146,14 +146,20 @@ async function handleDepositWebhook(
   const cls = classifyStatus(kpayData.status);
 
   if (cls === "SUCCESS") {
+    // C7 — Crédite NET (montant - frais K-Pay 2%)
+    const { getSettingNumber } = await import("@/lib/actions/wallet");
+    const feePercent = await getSettingNumber("kpay.fee.percent", 2);
+    const fee = Math.ceil((payment.amount * feePercent) / 100);
+    const netCredit = payment.amount - fee;
+
     await applyWalletDelta({
       userId: payment.userId,
-      amount: payment.amount,
+      amount: netCredit,
       type: "DEPOSIT",
-      description: `Dépôt MoMo de ${payment.amount} FCFA`,
+      description: `Dépôt MoMo ${payment.amount} FCFA - frais ${fee} = ${netCredit} crédités`,
       reference: payment.id,
       idempotencyRef: `kpay_dep_${payment.id}`,
-      metadata: { kpayId: kpayData.id, source: "webhook" },
+      metadata: { kpayId: kpayData.id, source: "webhook", gross: payment.amount, fee, net: netCredit },
     });
     await prisma.payment.update({
       where: { id: payment.id },
@@ -163,11 +169,11 @@ async function handleDepositWebhook(
       data: {
         userId: payment.userId,
         title: "Dépôt réussi ✅",
-        body: `${payment.amount} FCFA crédités sur votre compte.`,
+        body: `${netCredit} FCFA crédités sur votre compte (sur ${payment.amount} FCFA payés, frais K-Pay : ${fee} FCFA).`,
         link: "/portefeuille",
       },
     });
-    return NextResponse.json({ received: true, credited: payment.amount });
+    return NextResponse.json({ received: true, credited: netCredit, fee });
   }
 
   if (cls === "FAILED") {

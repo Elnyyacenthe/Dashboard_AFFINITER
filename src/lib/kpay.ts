@@ -273,8 +273,21 @@ export async function getWithdrawalStatus(withdrawalId: string): Promise<KpayPay
  */
 export function verifyWebhookSignature(rawBody: string, signature: string | null): boolean | null {
   const secret = process.env.KPAY_WEBHOOK_SECRET;
-  if (!secret) return null;
-  if (!signature) return false;
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!secret) {
+    if (isProd) {
+      console.error(
+        "[KPAY SECURITY] KPAY_WEBHOOK_SECRET manquant en production — webhook rejeté.",
+      );
+      return false;
+    }
+    return null; // En dev sans secret = tolérant
+  }
+  if (!signature) {
+    if (isProd) return false;
+    return null;
+  }
 
   const cleaned = signature.toLowerCase().replace(/^sha256=/, "");
   const expected = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");

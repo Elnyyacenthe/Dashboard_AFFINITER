@@ -94,7 +94,7 @@ export async function createAdAction(
   if (!session?.user) return { ok: false, error: "Vous devez être connecté(e)" };
 
   const ip = (await headers()).get("x-forwarded-for") ?? session.user.id;
-  const rl = rateLimit(`ad-create:${ip}`, RL.adCreate);
+  const rl = await rateLimit(`ad-create:${ip}`, RL.adCreate);
   if (!rl.success) return { ok: false, error: "Limite atteinte : 3 annonces par heure" };
 
   // Seuls les ESCORT (et ADMIN pour les tests) peuvent publier

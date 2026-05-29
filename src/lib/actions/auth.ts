@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
 import { signUpSchema, signInSchema } from "@/lib/validations/auth";
 import { rateLimit, RL } from "@/lib/rate-limit";
-import { applyWalletDelta, getSettingNumber } from "@/lib/actions/wallet";
+import { getSettingNumber } from "@/lib/actions/wallet";
 
 export type AuthState =
   | { ok: true; nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number } }
@@ -27,7 +27,7 @@ function generateReferralCode(): string {
 /** Connexion par email/téléphone + mot de passe. */
 export async function loginAction(_prev: AuthState | null, formData: FormData): Promise<AuthState> {
   const ip = (await headers()).get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`login:${ip}`, RL.auth);
+  const rl = await rateLimit(`login:${ip}`, RL.auth);
   if (!rl.success) {
     return { ok: false, error: "Trop de tentatives. Réessayez dans une minute." };
   }
@@ -59,7 +59,7 @@ export async function loginAction(_prev: AuthState | null, formData: FormData): 
 /** Inscription Client ou Escort avec tier optionnel + code parrainage. */
 export async function registerAction(_prev: AuthState | null, formData: FormData): Promise<AuthState> {
   const ip = (await headers()).get("x-forwarded-for") ?? "unknown";
-  const rl = rateLimit(`register:${ip}`, RL.auth);
+  const rl = await rateLimit(`register:${ip}`, RL.auth);
   if (!rl.success) {
     return { ok: false, error: "Trop de tentatives. Réessayez plus tard." };
   }
@@ -128,28 +128,17 @@ export async function registerAction(_prev: AuthState | null, formData: FormData
     select: { id: true },
   });
 
-  // Bonus parrainage inscription (immédiat, plus petit que le bonus paiement)
+  // C6 (audit Phase 1) : bonus parrainage à l'inscription SUPPRIMÉ (anti-farming).
+  // Le bonus n'est versé qu'au 1er paiement Premium/VIP du filleul.
   if (referrer) {
-    const bonus = await getSettingNumber("referral.bonus.signup", 500);
-    if (bonus > 0) {
-      await applyWalletDelta({
+    await prisma.notification.create({
+      data: {
         userId: referrer.id,
-        amount: bonus,
-        type: "REFERRAL_BONUS",
-        description: `Bonus parrainage : ${name} vient de s'inscrire`,
-        reference: `ref_signup_${user.id}`,
-        idempotencyRef: `ref_signup_${user.id}`,
-        metadata: { refereeId: user.id },
-      }).catch(() => null);
-      await prisma.notification.create({
-        data: {
-          userId: referrer.id,
-          title: "Bonus parrainage 🎁",
-          body: `${name} vient de s'inscrire avec votre code. ${bonus} FCFA crédités !`,
-          link: "/portefeuille",
-        },
-      });
-    }
+        title: "Nouveau filleul 👋",
+        body: `${name} vient de s'inscrire avec votre code. Vous recevrez un bonus dès son premier paiement Premium / VIP.`,
+        link: "/parrainage",
+      },
+    }).catch(() => null);
   }
 
   // Auto-login

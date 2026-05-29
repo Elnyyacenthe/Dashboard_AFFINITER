@@ -130,7 +130,7 @@ export async function initiateDepositAction(input: {
   }
 
   const ip = (await headers()).get("x-forwarded-for") ?? session.user.id;
-  const rl = rateLimit(`deposit:${ip}`, { limit: 10, windowMs: 60_000 });
+  const rl = await rateLimit(`deposit:${ip}`, { limit: 10, windowMs: 60_000 });
   if (!rl.success) return { ok: false, error: "Trop de tentatives, attendez 1 min" };
 
   // Validation
@@ -263,15 +263,19 @@ export async function checkAndApplyDepositAction(paymentId: string): Promise<
     const cls = classifyStatus(kpayPayment.status);
 
     if (cls === "SUCCESS") {
-      // Crédite wallet idempotent
+      // C7 — Crédite NET (montant - frais K-Pay 2%)
+      const feePercent = await getSettingNumber("kpay.fee.percent", 2);
+      const fee = Math.ceil((payment.amount * feePercent) / 100);
+      const netCredit = payment.amount - fee;
+
       await applyWalletDelta({
         userId: payment.userId,
-        amount: payment.amount,
+        amount: netCredit,
         type: "DEPOSIT",
-        description: `Dépôt MoMo de ${payment.amount} FCFA`,
+        description: `Dépôt MoMo ${payment.amount} FCFA - frais ${fee} = ${netCredit} crédités`,
         reference: payment.id,
         idempotencyRef: `kpay_dep_${payment.id}`,
-        metadata: { kpayId: kpayPayment.id, source: "client_poll" },
+        metadata: { kpayId: kpayPayment.id, source: "client_poll", gross: payment.amount, fee, net: netCredit },
       });
       await prisma.payment.update({
         where: { id: payment.id },
@@ -322,7 +326,7 @@ export async function initiateWithdrawalAction(input: {
   }
 
   const ip = (await headers()).get("x-forwarded-for") ?? session.user.id;
-  const rl = rateLimit(`withdraw:${ip}`, { limit: 5, windowMs: 60_000 });
+  const rl = await rateLimit(`withdraw:${ip}`, { limit: 5, windowMs: 60_000 });
   if (!rl.success) return { ok: false, error: "Trop de tentatives, attendez 1 min" };
 
   const minWithdraw = await getSettingNumber("withdrawal.min", 5000);
@@ -335,18 +339,50 @@ export async function initiateWithdrawalAction(input: {
     return { ok: false, error: "Numéro Cameroun invalide" };
   }
 
+  // C4 — Plafond retrait quotidien (anti-aspiration de wallet)
+  // Par défaut : 25 000 FCFA / 24h sans KYC (cf. CGU article 20)
+  const dailyCap = await getSettingNumber("withdrawal.daily.cap.unverified", 25_000);
+  const profile = await prisma.escortProfile.findUnique({
+    where: { userId: session.user.id },
+    select: { isVerified: true },
+  });
+  if (!profile?.isVerified) {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const todayWithdrawals = await prisma.withdrawalRequest.aggregate({
+      where: {
+        userId: session.user.id,
+        status: { in: ["PENDING", "PAID"] },
+        createdAt: { gte: since },
+      },
+      _sum: { amount: true },
+    });
+    const used = todayWithdrawals._sum.amount ?? 0;
+    if (used + amount > dailyCap) {
+      const remaining = Math.max(0, dailyCap - used);
+      return {
+        ok: false,
+        error: `Plafond journalier atteint (${dailyCap.toLocaleString("fr-FR")} FCFA / 24h sans vérification d'identité). Reste disponible : ${remaining.toLocaleString("fr-FR")} FCFA. Faites vérifier votre profil pour augmenter cette limite.`,
+      };
+    }
+  }
+
+  // C7 — Frais K-Pay 2% facturés au user (debit = amount + fee)
+  const feePercent = await getSettingNumber("kpay.fee.percent", 2);
+  const fee = Math.ceil((amount * feePercent) / 100);
+  const totalDebit = amount + fee;
+
   const externalId = makeExternalId("WITHDRAW", session.user.id);
 
-  // 1. Débit atomique
+  // 1. Débit atomique (montant + frais K-Pay)
   try {
     await applyWalletDelta({
       userId: session.user.id,
-      amount: -amount,
+      amount: -totalDebit,
       type: "WITHDRAWAL",
-      description: `Retrait MoMo de ${amount} FCFA vers ${phone}`,
+      description: `Retrait ${amount} FCFA vers ${phone} (frais ${fee} FCFA inclus)`,
       reference: externalId,
       idempotencyRef: `kpay_wd_debit_${externalId}`,
-      metadata: { phone, externalId },
+      metadata: { phone, externalId, netAmount: amount, fee, totalDebit },
     });
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Solde insuffisant" };
@@ -383,16 +419,16 @@ export async function initiateWithdrawalAction(input: {
       message: "Retrait initié. Vous recevrez l'argent sous peu.",
     };
   } catch (e) {
-    // 4. Refund automatique
+    // 4. Refund automatique (remboursement intégral : amount + fee)
     const msg = e instanceof KpayError ? e.message : "Erreur K-Pay";
     await applyWalletDelta({
       userId: session.user.id,
-      amount,
+      amount: totalDebit,
       type: "REFUND",
-      description: `Remboursement retrait échoué : ${msg}`,
+      description: `Remboursement retrait échoué (${amount} + frais ${fee}) : ${msg}`,
       reference: externalId,
       idempotencyRef: `kpay_wd_refund_${externalId}`,
-      metadata: { reason: msg, withdrawalId: withdrawal.id },
+      metadata: { reason: msg, withdrawalId: withdrawal.id, netAmount: amount, fee },
     });
     await prisma.withdrawalRequest.update({
       where: { id: withdrawal.id },

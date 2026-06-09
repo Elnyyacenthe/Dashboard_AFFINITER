@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { signIn, signOut } from "@/auth";
 import { signUpSchema, signInSchema } from "@/lib/validations/auth";
 import { rateLimit, RL } from "@/lib/rate-limit";
-import { getSettingNumber } from "@/lib/actions/wallet";
+import { getSettingNumber } from "@/lib/settings";
 
 export type AuthState =
   | { ok: true; nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number } }

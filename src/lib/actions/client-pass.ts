@@ -1,92 +1,19 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { applyWalletDelta, getSettingNumber } from "@/lib/actions/wallet";
+import { getSettingNumber } from "@/lib/settings";
 import { hashString } from "@/lib/utils";
 
 // =====================================================================
-// I9 — PASS PREMIUM CLIENT (1000 FCFA / mois)
+// I10 — REVELATION NUMÉRO (gated par Pass Premium ou cap quotidien)
 // =====================================================================
-
-/**
- * Souscrit (ou prolonge) le Pass Premium Client.
- * Cumulable : si déjà abonné, ajoute X jours à la durée restante.
- */
-export async function subscribeClientPassAction(input: {
-  months?: number; // 1 par défaut
-}): Promise<{ ok: true; until: Date; charged: number } | { ok: false; error: string }> {
-  const session = await auth();
-  if (!session?.user) return { ok: false, error: "Non authentifié" };
-
-  const months = Math.max(1, Math.min(12, input.months ?? 1));
-  const monthlyPrice = await getSettingNumber("pricing.clientpass.amount", 1000);
-  const daysPerMonth = await getSettingNumber("pricing.clientpass.days", 30);
-  const total = monthlyPrice * months;
-  const days = daysPerMonth * months;
-
-  try {
-    await applyWalletDelta({
-      userId: session.user.id,
-      amount: -total,
-      type: "BOOST_PAYMENT",
-      description: `Pass Premium Client ${months} mois`,
-      reference: `clientpass_${session.user.id}_${Date.now()}`,
-      metadata: { type: "CLIENT_PASS", months, days },
-    });
-  } catch (e) {
-    return {
-      ok: false,
-      error: e instanceof Error ? e.message : "Solde insuffisant. Rechargez votre wallet.",
-    };
-  }
-
-  // Étend l'expiration (cumul si déjà actif)
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { clientPassUntil: true },
-  });
-  const now = new Date();
-  const base = user?.clientPassUntil && user.clientPassUntil > now ? user.clientPassUntil : now;
-  const newUntil = new Date(base.getTime() + days * 86_400_000);
-
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { clientPassUntil: newUntil },
-  });
-
-  await prisma.payment.create({
-    data: {
-      userId: session.user.id,
-      amount: total,
-      provider: "WALLET",
-      status: "PAID",
-      durationDays: days,
-      paidAt: now,
-      metadata: { type: "CLIENT_PASS", months },
-    },
-  });
-
-  await prisma.notification.create({
-    data: {
-      userId: session.user.id,
-      title: "Pass Premium activé 💎",
-      body: `Vous êtes Pass Premium jusqu'au ${newUntil.toLocaleDateString("fr-FR")}. Révélations WhatsApp illimitées, navigation incognito, accès prioritaire.`,
-      link: "/client/pass-premium",
-    },
-  });
-
-  revalidatePath("/client");
-  revalidatePath("/client/pass-premium");
-  return { ok: true, until: newUntil, charged: total };
-}
-
-// =====================================================================
-// REVELATION NUMÉRO — gated par Pass ou par cap quotidien
-// =====================================================================
+//
+// Note v2 : la souscription au Pass Premium se fait maintenant via
+// `initiateClientPassAction` (paiement K-Pay direct one-shot, dans payments.ts).
+// Ce fichier ne garde QUE la logique de révélation.
 
 interface RevealResult {
   ok: true;
@@ -105,7 +32,7 @@ interface RevealError {
  * Révèle le numéro WhatsApp d'une annonce.
  *
  * Règles :
- *   - Pass Premium actif → illimité (cap énorme)
+ *   - Pass Premium actif → cap énorme (illimité de facto)
  *   - Sans Pass : 3 révélations / jour (configurable)
  *   - Reset quotidien à minuit (par user)
  *   - Visiteur non connecté : 1 révélation / jour par IP
@@ -128,7 +55,7 @@ export async function revealNumberAction(
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-  // Pour un visiteur non connecté : check par IP
+  // Visiteur non connecté : check par IP
   if (!session?.user) {
     const revealsToday = await prisma.numberReveal.count({
       where: { ipHash, createdAt: { gte: todayStart } },
@@ -151,7 +78,7 @@ export async function revealNumberAction(
     };
   }
 
-  // Pour un user connecté : check Pass Premium puis cap quotidien
+  // User connecté : check Pass Premium puis cap quotidien
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
     select: { clientPassUntil: true, dailyRevealsCount: true, dailyRevealsResetAt: true },
@@ -163,7 +90,6 @@ export async function revealNumberAction(
     ? await getSettingNumber("clientpass.reveals.daily.premium", 999)
     : await getSettingNumber("clientpass.reveals.daily.free", 3);
 
-  // Reset compteur si nouveau jour
   let count = user.dailyRevealsCount;
   if (!user.dailyRevealsResetAt || user.dailyRevealsResetAt < todayStart) {
     count = 0;
@@ -179,7 +105,6 @@ export async function revealNumberAction(
     };
   }
 
-  // Update compteur + log
   await prisma.$transaction([
     prisma.user.update({
       where: { id: session.user.id },
@@ -202,9 +127,7 @@ export async function revealNumberAction(
   };
 }
 
-/**
- * Helper : indique si l'user courant a un Pass Premium Client actif.
- */
+/** Helper : indique si l'user courant a un Pass Premium Client actif. */
 export async function isClientPassActive(): Promise<boolean> {
   const session = await auth();
   if (!session?.user) return false;

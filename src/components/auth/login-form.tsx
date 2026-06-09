@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect } from "react";
-import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,12 +68,6 @@ export function LoginForm() {
             {(pending || redirecting) && <Loader2 className="h-4 w-4 animate-spin" />}
             {redirecting ? "Redirection…" : pending ? "Connexion…" : "Se connecter"}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Pas encore de compte ?{" "}
-            <Link href="/inscription" className="text-primary hover:underline">
-              Créer un compte
-            </Link>
-          </p>
         </form>
       </CardContent>
     </Card>

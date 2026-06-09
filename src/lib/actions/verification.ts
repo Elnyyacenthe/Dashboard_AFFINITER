@@ -6,7 +6,6 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { chargeVerificationFee } from "@/lib/actions/wallet";
 
 const submitSchema = z.object({
   documentType: z.enum(["CNI", "PASSPORT", "DRIVING_LICENSE"]),
@@ -71,19 +70,40 @@ export async function submitVerificationAction(input: unknown): Promise<Verifica
     return { ok: false, error: "Une vérification est déjà en cours d'examen." };
   }
 
-  // I8 — Vérification payante (3000 FCFA par défaut, configurable)
-  // On débite AVANT de créer la row pour éviter les fraudes par refresh.
-  // Si le user a déjà payé pour une vérification précédente refusée, on ne re-facture pas.
-  const previousPaid = await prisma.idVerification.findFirst({
+  // I8 — Vérification payante : on accepte la soumission si l'user a un
+  //   Payment VERIFICATION PAID + intentApplied dans les 24 dernières heures
+  //   ET non encore associé à une IdVerification (1 paiement = 1 verif).
+  // Si l'user a une verif précédemment refusée, il peut re-soumettre gratuitement.
+  const previousRejected = await prisma.idVerification.findFirst({
     where: { userId: session.user.id, status: "REJECTED" },
     select: { id: true },
   });
-  if (!previousPaid) {
-    const fee = await chargeVerificationFee(session.user.id);
-    if (!fee.ok) {
+  if (!previousRejected) {
+    const recentPaid = await prisma.payment.findFirst({
+      where: {
+        userId: session.user.id,
+        status: "PAID",
+        intentApplied: true,
+        intent: { path: ["type"], equals: "VERIFICATION" },
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, createdAt: true },
+    });
+    if (!recentPaid) {
       return {
         ok: false,
-        error: `${fee.error}. Rechargez votre wallet pour soumettre une vérification.`,
+        error: "Paiement de la vérification requis. Cliquez sur 'Payer la vérification' avant de soumettre.",
+      };
+    }
+    // 1 paiement = 1 verif : si une verif existe créée après ce paiement → déjà consommé
+    const alreadyConsumed = await prisma.idVerification.findFirst({
+      where: { userId: session.user.id, createdAt: { gt: recentPaid.createdAt } },
+    });
+    if (alreadyConsumed) {
+      return {
+        ok: false,
+        error: "Ce paiement a déjà été utilisé pour une vérification. Effectuez un nouveau paiement.",
       };
     }
   }

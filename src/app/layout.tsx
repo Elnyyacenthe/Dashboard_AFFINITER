@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 
 import { SITE_NAME, SITE_URL } from "@/lib/utils";
-import { AgeGate } from "@/components/layout/age-gate";
 import { Providers } from "@/components/providers";
 
 import "./globals.css";
@@ -34,7 +33,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" suppressHydrationWarning className={`${sans.variable} ${display.variable}`}>
       <body>
         <Providers>
-          <AgeGate />
           {children}
         </Providers>
       </body>

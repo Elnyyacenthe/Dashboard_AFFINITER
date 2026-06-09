@@ -1,6 +1,5 @@
-import { PrismaClient, Role, AdStatus, AdTier, Gender } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
-import bcrypt from "bcryptjs";
 
 // Bypass du URL-parser Prisma (cassé sur les passwords avec `@`) — on délègue
 // au driver `pg` qui gère correctement les caractères URL-encodés.
@@ -101,11 +100,6 @@ const CITIES = [
   },
 ];
 
-const SAMPLE_SERVICES = [
-  "Massage", "Striptease", "GFE", "Sortie accompagnement", "Soirée",
-  "Couple", "Domination soft", "Massage tantrique",
-];
-
 async function main() {
   console.log("🌱 Seeding database…");
 
@@ -119,137 +113,8 @@ async function main() {
   }
   console.log(`✓ ${CITIES.length} villes insérées`);
 
-  // --------- Admin ----------
-  const adminEmail = process.env.ADMIN_EMAIL ?? "admin@yamo.cm";
-  const adminPassword = process.env.ADMIN_PASSWORD ?? "ChangeMe123!";
-  const hashed = await bcrypt.hash(adminPassword, 10);
-
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: Role.ADMIN },
-    create: {
-      email: adminEmail,
-      password: hashed,
-      name: "Administrateur",
-      role: Role.ADMIN,
-      emailVerified: new Date(),
-    },
-  });
-  console.log(`✓ Admin: ${adminEmail} / ${adminPassword}`);
-
-  // --------- Escort de démo ----------
-  const escortEmail = "escort@yamo.cm";
-  const escortPwd = await bcrypt.hash("Demo1234!", 10);
-
-  const escortUser = await prisma.user.upsert({
-    where: { email: escortEmail },
-    update: {},
-    create: {
-      email: escortEmail,
-      password: escortPwd,
-      name: "Sandra Demo",
-      role: Role.ESCORT,
-      phone: "+237600000001",
-      emailVerified: new Date(),
-    },
-  });
-
-  const profile = await prisma.escortProfile.upsert({
-    where: { userId: escortUser.id },
-    update: {},
-    create: {
-      userId: escortUser.id,
-      displayName: "Sandra",
-      slug: "sandra-demo",
-      bio: "Charmante, douce et professionnelle. Disponible pour des moments inoubliables.",
-      age: 24,
-      gender: Gender.FEMALE,
-      height: 170,
-      weight: 60,
-      ethnicity: "Camerounaise",
-      languages: ["Français", "Anglais"],
-      isVerified: true,
-      verifiedAt: new Date(),
-    },
-  });
-
-  // --------- Annonces de démo ----------
-  const douala = await prisma.city.findUnique({ where: { slug: "douala" } });
-  const yaounde = await prisma.city.findUnique({ where: { slug: "yaounde" } });
-
-  if (douala) {
-    await prisma.ad.upsert({
-      where: { slug: "sandra-massage-douala" },
-      update: {},
-      create: {
-        ownerId: escortUser.id,
-        profileId: profile.id,
-        cityId: douala.id,
-        title: "Sandra, massage et plus à Douala Bonapriso",
-        slug: "sandra-massage-douala",
-        description:
-          "Bonjour messieurs, je suis Sandra, 24 ans, je vous propose un moment de détente totale dans un cadre discret et confortable à Bonapriso.",
-        price: 25000,
-        priceNight: 100000,
-        whatsappPhone: "+237600000001",
-        callPhone: "+237600000001",
-        neighborhood: "Bonapriso",
-        services: SAMPLE_SERVICES.slice(0, 4),
-        status: AdStatus.ACTIVE,
-        tier: AdTier.VIP,
-        publishedAt: new Date(),
-        promotedUntil: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-        incall: true,
-        outcall: true,
-        media: {
-          create: [
-            {
-              url: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800",
-              isPrimary: true,
-              isApproved: true,
-              position: 0,
-            },
-            {
-              url: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800",
-              isApproved: true,
-              position: 1,
-            },
-          ],
-        },
-      },
-    });
-  }
-
-  if (yaounde) {
-    await prisma.ad.upsert({
-      where: { slug: "demo-yaounde-bastos" },
-      update: {},
-      create: {
-        ownerId: escortUser.id,
-        profileId: profile.id,
-        cityId: yaounde.id,
-        title: "Soirée VIP à Bastos – Yaoundé",
-        slug: "demo-yaounde-bastos",
-        description: "Pour les hommes d'affaires de passage. Discrétion garantie.",
-        price: 30000,
-        whatsappPhone: "+237600000001",
-        neighborhood: "Bastos",
-        services: SAMPLE_SERVICES.slice(2, 6),
-        status: AdStatus.ACTIVE,
-        tier: AdTier.PREMIUM,
-        publishedAt: new Date(),
-        media: {
-          create: [
-            {
-              url: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=800",
-              isPrimary: true,
-              isApproved: true,
-            },
-          ],
-        },
-      },
-    });
-  }
+  // NB : aucun compte n'est créé par le seed. Le dashboard ne contient que des
+  // comptes réels ; l'admin est désigné manuellement parmi les utilisateurs existants.
 
   // --------- Réglages du site ----------
   await prisma.siteSetting.upsert({

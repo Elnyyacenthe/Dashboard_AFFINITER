@@ -138,7 +138,7 @@ export function detectPaymentMethod(phone: string): KpayPaymentMethod {
 }
 
 /** ID externe unique pour idempotence côté K-Pay et anti-double-paiement. */
-export function makeExternalId(prefix: "DEPOSIT" | "WITHDRAW" | "BOOST", userId: string): string {
+export function makeExternalId(prefix: string, userId: string): string {
   const short = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
   return `${prefix}_${short}_${userId}`;
 }

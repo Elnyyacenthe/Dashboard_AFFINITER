@@ -58,18 +58,12 @@ export function RegisterForm() {
   useEffect(() => {
     if (state?.ok) {
       toast.success("Compte créé 🎉");
-      // Hard nav pour propager le cookie de session immédiatement
-      const target =
-        state.nextStep?.type === "PAYMENT"
-          ? `/escort/portefeuille/payer?tier=${state.nextStep.tier}&amount=${state.nextStep.amount}`
-          : role === "ESCORT"
-            ? "/escort/dashboard"
-            : "/client";
-      window.location.assign(target);
+      // Le serveur a déjà construit l'URL cible (interne /admin OU externe dashboard.yamo.cm).
+      window.location.assign("/");
     } else if (state && !state.ok) {
       toast.error(state.error);
     }
-  }, [state, role]);
+  }, [state]);
 
   return (
     <Card className="border-primary/20">
@@ -163,17 +157,6 @@ export function RegisterForm() {
               <Label htmlFor="confirmPassword">Confirmer</Label>
               <Input id="confirmPassword" name="confirmPassword" type="password" required minLength={8} />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="referralCode">Code parrainage (optionnel)</Label>
-            <Input
-              id="referralCode"
-              name="referralCode"
-              defaultValue={refParam}
-              placeholder="YAMO-XXXXXX"
-              className="uppercase"
-            />
           </div>
 
           <div className="space-y-3 rounded-lg border border-border/60 bg-secondary/30 p-3">

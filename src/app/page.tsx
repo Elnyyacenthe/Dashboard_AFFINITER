@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 
 /**
- * yamo-dashboard.cm — back-office Yamo (admin + dev + service client).
+ * yamo-dashboard.cm — back-office Affiniter (admin + dev + service client).
  *
  * Pas d'espace public : tous les visiteurs sont redirigés
  *   - non connecté → /connexion
  *   - connecté admin → /admin
- *   - connecté non-admin → yamo.cm
+ *   - connecté non-admin → affiniter.cm
  */
 export default async function DashboardRootPage() {
   const session = await auth();
@@ -19,7 +19,7 @@ export default async function DashboardRootPage() {
     redirect("/admin");
   }
 
-  // ESCORT/CLIENT n'ont rien à faire ici → renvoyer sur yamo.cm
-  const yamoUrl = process.env.NEXT_PUBLIC_YAMO_URL ?? "https://yamo.cm";
+  // ESCORT/CLIENT n'ont rien à faire ici → renvoyer sur affiniter.cm
+  const yamoUrl = process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm";
   redirect(yamoUrl);
 }

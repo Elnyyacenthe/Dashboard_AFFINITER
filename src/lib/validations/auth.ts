@@ -28,7 +28,7 @@ export const signUpSchema = z
     role: z.enum(["CLIENT", "ESCORT"]),
     /** Tier sélectionné à l'inscription (escort uniquement, sinon ignoré). */
     tier: z.enum(["STANDARD", "PREMIUM", "VIP"]).default("STANDARD"),
-    /** Code parrainage optionnel (YAMO-XXXX). */
+    /** Code parrainage optionnel (AFF-XXXX). */
     referralCode: z.string().trim().toUpperCase().optional(),
     acceptTerms: z.literal(true, { errorMap: () => ({ message: "Vous devez accepter les CGU" }) }),
     acceptAdult: z.literal(true, { errorMap: () => ({ message: "Vous devez confirmer avoir 18+ ans" }) }),

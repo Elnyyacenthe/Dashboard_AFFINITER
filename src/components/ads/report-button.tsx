@@ -63,7 +63,7 @@ export function ReportButton({ adId }: { adId: string }) {
         <DialogHeader>
           <DialogTitle>Signaler cette annonce</DialogTitle>
           <DialogDescription>
-            Aidez-nous à garder Yamo sain. Vos signalements sont anonymes et examinés sous 24h.
+            Aidez-nous à garder Affiniter sain. Vos signalements sont anonymes et examinés sous 24h.
           </DialogDescription>
         </DialogHeader>
 

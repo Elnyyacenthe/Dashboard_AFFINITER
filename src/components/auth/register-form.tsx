@@ -58,7 +58,7 @@ export function RegisterForm() {
   useEffect(() => {
     if (state?.ok) {
       toast.success("Compte créé 🎉");
-      // Le serveur a déjà construit l'URL cible (interne /admin OU externe dashboard.yamo.cm).
+      // Le serveur a déjà construit l'URL cible (interne /admin OU externe dashboard.affiniter.cm).
       window.location.assign("/");
     } else if (state && !state.ok) {
       toast.error(state.error);

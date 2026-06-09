@@ -14,8 +14,8 @@ export function CopyReferralCode({ code, url }: { code: string; url: string }) {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
-          title: "Rejoins Yamo",
-          text: `Inscris-toi sur Yamo avec mon code ${code} et reçois un bonus de bienvenue !`,
+          title: "Rejoins Affiniter",
+          text: `Inscris-toi sur Affiniter avec mon code ${code} et reçois un bonus de bienvenue !`,
           url,
         });
       } catch {

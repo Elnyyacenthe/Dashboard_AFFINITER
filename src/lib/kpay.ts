@@ -15,7 +15,7 @@
  *   KPAY_API_KEY=kpay_live_xxx       (ou kpay_test_xxx en sandbox)
  *   KPAY_SECRET_KEY=...
  *   KPAY_WEBHOOK_SECRET=...          (optionnel, défense en profondeur)
- *   KPAY_CALLBACK_URL=https://yamo.cm/api/webhooks/kpay
+ *   KPAY_CALLBACK_URL=https://affiniter.cm/api/webhooks/kpay
  */
 
 import crypto from "node:crypto";
@@ -165,7 +165,7 @@ export async function initDeposit(input: InitDepositInput): Promise<KpayPayment>
     phoneNumber: input.phoneNumber,
     externalId: input.externalId,
     paymentMethod,
-    description: input.description ?? `Dépôt de ${input.amount} FCFA sur Yamo`,
+    description: input.description ?? `Dépôt de ${input.amount} FCFA sur Affiniter`,
     ...(input.customerEmail && { customerEmail: input.customerEmail }),
     ...(input.customerName && { customerName: input.customerName }),
     ...(input.metadata && { metadata: input.metadata }),
@@ -224,7 +224,7 @@ export async function initWithdrawal(input: InitWithdrawalInput): Promise<KpayPa
     amount: input.amount,
     phoneNumber: input.phoneNumber,
     paymentMethod,
-    description: input.description ?? `Retrait Yamo de ${input.amount} FCFA`,
+    description: input.description ?? `Retrait Affiniter de ${input.amount} FCFA`,
   };
 
   let resp: Response;

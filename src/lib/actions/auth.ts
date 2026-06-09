@@ -16,12 +16,12 @@ export type AuthState =
   | { ok: true; nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number } }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
 
-/** Génère un code parrainage unique format YAMO-XXXX. */
+/** Génère un code parrainage unique format AFF-XXXX. */
 function generateReferralCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
-  return `YAMO-${code}`;
+  return `AFF-${code}`;
 }
 
 /** Connexion par email/téléphone + mot de passe. */

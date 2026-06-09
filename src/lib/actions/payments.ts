@@ -170,12 +170,20 @@ export async function initiateServicePhotoAction(input: {
   });
   if (!ad || ad.ownerId !== session.user.id) return err("Annonce introuvable");
 
+  // V10 — Check anti-doublon AVANT de demander le paiement (sinon l'user paie pour rien)
+  const { checkPhotoDuplicate } = await import("@/lib/actions/photo-duplicate-check");
+  const dup = await checkPhotoDuplicate(input.url, session.user.id);
+  if (!dup.ok) return err(dup.reason);
+
   const amount = await getSettingNumber("pricing.servicePhoto.amount", 300);
   return kpayOneShotPayment({
     userId: session.user.id,
     amount,
     phone: input.phone,
-    intent: { type: "SERVICE_PHOTO", payload: { adId: input.adId, url: input.url } },
+    intent: {
+      type: "SERVICE_PHOTO",
+      payload: { adId: input.adId, url: input.url, imageHash: dup.imageHash },
+    },
     description: `Photo service "${ad.title}"`,
   });
 }

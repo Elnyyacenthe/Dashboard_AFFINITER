@@ -10,6 +10,7 @@ import { auth } from "@/auth";
 import { adSchema, adFilterSchema, type AdFilter } from "@/lib/validations/ad";
 import { rateLimit, RL } from "@/lib/rate-limit";
 import { slugify, hashString } from "@/lib/utils";
+import { getSettingNumber } from "@/lib/settings";
 
 const PER_PAGE = 24;
 
@@ -162,13 +163,24 @@ export async function createAdAction(
   const videoUrls = formData.getAll("videoUrls").map(String).filter(Boolean);
 
   // I6 — Cap photos selon le tier (annonce nouvelle = STANDARD au départ)
-  const { getSettingNumber } = await import("@/lib/settings");
   const photoCap = await getSettingNumber("photos.cap.standard", 3);
   if (photoUrls.length > photoCap) {
     return {
       ok: false,
       error: `Limite photos atteinte : ${photoCap} max en plan Standard. Passez en Premium ou VIP pour en publier plus.`,
     };
+  }
+
+  // V10 — Anti-doublons photos : on calcule le pHash de chaque photo et on
+  //       refuse si une autre annonce a déjà la même photo.
+  const { checkPhotoDuplicate } = await import("@/lib/actions/photo-duplicate-check");
+  const photoHashes: (string | null)[] = [];
+  for (const url of photoUrls) {
+    const check = await checkPhotoDuplicate(url, session.user.id);
+    if (!check.ok) {
+      return { ok: false, error: check.reason };
+    }
+    photoHashes.push(check.imageHash || null);
   }
 
   // On ordonne : photos d'abord (la 1ère sera isPrimary), vidéos ensuite
@@ -178,6 +190,7 @@ export async function createAdAction(
       type: "PHOTO" as const,
       isPrimary: idx === 0,
       position: idx,
+      imageHash: photoHashes[idx],
     })),
     ...videoUrls.map((url, idx) => ({
       url,
@@ -278,7 +291,6 @@ export async function setAutoRenewAction(input: {
   adId: string;
   enabled: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const { auth } = await import("@/auth");
   const session = await auth();
   if (!session?.user) return { ok: false, error: "Non authentifié" };
 

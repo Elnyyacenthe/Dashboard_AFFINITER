@@ -41,6 +41,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             items={[
               { href: "/admin", label: "Vue d'ensemble", icon: <LayoutDashboard className="h-4 w-4" /> },
               { href: "/admin/moderation", label: "Modération", icon: <ListChecks className="h-4 w-4" />, badge: pendingAds },
+              { href: "/admin/moderation/doublons-photos", label: "Doublons photos", icon: <ListChecks className="h-4 w-4" /> },
               { href: "/admin/verifications", label: "Vérifications ID", icon: <BadgeCheck className="h-4 w-4" />, badge: pendingVerifs },
               { href: "/admin/annonces", label: "Toutes les annonces", icon: <ListChecks className="h-4 w-4" /> },
               { href: "/admin/utilisateurs", label: "Utilisateurs", icon: <Users className="h-4 w-4" /> },

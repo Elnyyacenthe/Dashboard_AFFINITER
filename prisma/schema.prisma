@@ -426,6 +426,8 @@ model Media {
   // Phase 2B — Photos service (payantes par publication)
   isServicePhoto  Boolean   @default(false)
   paymentId       String?
+  // v10 — pHash perceptuel hex 16 chars pour détection doublons
+  imageHash       String?
 
   ad Ad @relation(fields: [adId], references: [id], onDelete: Cascade)
 
@@ -433,6 +435,7 @@ model Media {
 
   @@index([adId, position])
   @@index([isServicePhoto])
+  @@index([imageHash])
 }
 
 model Favorite {

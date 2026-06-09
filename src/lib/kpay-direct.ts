@@ -22,7 +22,7 @@ export type PaymentIntent =
   | { type: "BUMP"; payload: { adId: string } }
   | { type: "STICKY"; payload: { adId: string; hours: number } }
   | { type: "TIER_UPGRADE"; payload: { adId: string; tier: "PREMIUM" | "VIP" | "DIAMOND"; days: number; autoRenew?: boolean } }
-  | { type: "SERVICE_PHOTO"; payload: { adId: string; url: string } }
+  | { type: "SERVICE_PHOTO"; payload: { adId: string; url: string; imageHash?: string } }
   | { type: "VERIFICATION"; payload: { userId: string } }
   | { type: "CLIENT_PASS"; payload: { userId: string; months: number; days: number } }
   | { type: "REVEAL"; payload: { adId: string; userId: string } };
@@ -275,6 +275,7 @@ export async function applyIntent(paymentId: string): Promise<void> {
             isApproved: false,
             paymentId,
             position,
+            imageHash: intent.payload.imageHash ?? null,
           },
         });
         break;

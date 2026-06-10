@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Shield, LayoutDashboard, Users, ListChecks, Flag, CreditCard, BarChart3, Settings, BadgeCheck, Wallet, DollarSign, MapPin, MessageSquare } from "lucide-react";
+import Image from "next/image";
+import { LayoutDashboard, Users, ListChecks, Flag, CreditCard, BarChart3, Settings, BadgeCheck, Wallet, DollarSign, MapPin, MessageSquare } from "lucide-react";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -30,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <aside className="border-b border-border/60 bg-gradient-to-b from-card to-background md:border-b-0 md:border-r">
         <div className="flex h-16 items-center px-6">
           <Link href="/" className="flex items-center gap-2">
-            <Shield className="h-6 w-6 text-primary" />
+            <Image src="/icon.svg" alt={SITE_NAME} width={28} height={28} priority />
             <span className="font-display text-xl font-bold gradient-text">{SITE_NAME} Admin</span>
           </Link>
         </div>

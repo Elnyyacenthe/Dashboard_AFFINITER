@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="heart-grad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ff3d8b"/>
+      <stop offset="100%" stop-color="#a020f0"/>
+    </linearGradient>
+    <linearGradient id="flame-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff5b8"/>
+      <stop offset="40%" stop-color="#ffb648"/>
+      <stop offset="100%" stop-color="#ff5e3a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fond sombre arrondi pour favicon -->
+  <rect width="64" height="64" rx="14" fill="#0d0014"/>
+
+  <!-- Cœur -->
+  <g transform="translate(8, 10)">
+    <path
+      d="M24 46
+         C 24 46, 2 32, 2 14
+         A 12 12 0 0 1 24 5
+         A 12 12 0 0 1 46 14
+         C 46 32, 24 46, 24 46 Z"
+      fill="url(#heart-grad)"
+      stroke="#ff3d8b"
+      stroke-width="1.2"
+    />
+    <!-- Flamme -->
+    <path
+      d="M24 34
+         C 20 29, 18 24, 21 18
+         C 22 21, 24 20, 24 18
+         C 24 14, 28 12, 26 8
+         C 30 9, 31 14, 30 18
+         C 31 17, 32 17, 32 20
+         C 32 26, 28 32, 24 34 Z"
+      fill="url(#flame-grad)"
+    />
+  </g>
+</svg>

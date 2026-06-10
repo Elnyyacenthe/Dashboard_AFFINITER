@@ -12,19 +12,14 @@ const display = Playfair_Display({ subsets: ["latin"], variable: "--font-display
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} — Annonces escorts au Cameroun`,
-    template: `%s · ${SITE_NAME}`,
+    default: `${SITE_NAME} — Back-office`,
+    template: `%s · ${SITE_NAME} Admin`,
   },
-  description:
-    "Plateforme N°1 d'annonces d'escorts et ndolo au Cameroun. Douala, Yaoundé, Bafoussam, Kribi… Rencontres adultes 18+ vérifiées.",
-  keywords: ["escort cameroun", "ndolo", "annonce douala", "annonce yaoundé", "rencontre adulte"],
-  robots: { index: true, follow: true },
-  openGraph: {
-    title: `${SITE_NAME} — Annonces escorts au Cameroun`,
-    description: "Plateforme d'annonces escorts au Cameroun (18+).",
-    type: "website",
-    locale: "fr_FR",
-    url: SITE_URL,
+  description: "Back-office Affiniter (admin + dev + service client).",
+  robots: { index: false, follow: false },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: "/icon.svg",
   },
 };
 

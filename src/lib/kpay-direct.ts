@@ -23,9 +23,7 @@ export type PaymentIntent =
   | { type: "STICKY"; payload: { adId: string; hours: number } }
   | { type: "TIER_UPGRADE"; payload: { adId: string; tier: "PREMIUM" | "VIP" | "DIAMOND"; days: number; autoRenew?: boolean } }
   | { type: "SERVICE_PHOTO"; payload: { adId: string; url: string; imageHash?: string } }
-  | { type: "VERIFICATION"; payload: { userId: string } }
-  | { type: "CLIENT_PASS"; payload: { userId: string; months: number; days: number } }
-  | { type: "REVEAL"; payload: { adId: string; userId: string } };
+  | { type: "VERIFICATION"; payload: { userId: string } };
 
 export type IntentType = PaymentIntent["type"];
 
@@ -286,39 +284,6 @@ export async function applyIntent(paymentId: string): Promise<void> {
         // Le client redirige ensuite l'user vers le formulaire KYC.
         break;
       }
-      case "REVEAL": {
-        // Pay-per-contact : créer NumberReveal + incrémenter whatsappClicks.
-        // Le numéro réel est lu dans Ad.whatsappPhone par l'endpoint /reveal après ce moment.
-        await tx.numberReveal.create({
-          data: {
-            adId: intent.payload.adId,
-            userId: intent.payload.userId,
-          },
-        });
-        await tx.ad.update({
-          where: { id: intent.payload.adId },
-          data: { whatsappClicks: { increment: 1 } },
-        });
-        break;
-      }
-      case "CLIENT_PASS": {
-        const user = await tx.user.findUnique({
-          where: { id: intent.payload.userId },
-          select: { clientPassUntil: true },
-        });
-        const now = new Date();
-        const base = user?.clientPassUntil && user.clientPassUntil > now ? user.clientPassUntil : now;
-        const newUntil = new Date(base.getTime() + intent.payload.days * 86_400_000);
-        await tx.user.update({
-          where: { id: intent.payload.userId },
-          data: { clientPassUntil: newUntil },
-        });
-        await tx.payment.update({
-          where: { id: paymentId },
-          data: { durationDays: intent.payload.days },
-        });
-        break;
-      }
     }
 
     // Notif user
@@ -348,8 +313,6 @@ function defaultDescription(intent: PaymentIntent, amount: number): string {
     case "TIER_UPGRADE": return `${intent.payload.tier} ${intent.payload.days}j (${amount} FCFA)`;
     case "SERVICE_PHOTO": return `Photo service (${amount} FCFA)`;
     case "VERIFICATION": return `Vérification d'identité (${amount} FCFA)`;
-    case "CLIENT_PASS": return `Pass Premium ${intent.payload.months} mois (${amount} FCFA)`;
-    case "REVEAL": return `Contact escort (${amount} FCFA)`;
   }
 }
 
@@ -360,8 +323,6 @@ function notificationTitle(type: IntentType): string {
     case "TIER_UPGRADE": return "Abonnement activé ⭐";
     case "SERVICE_PHOTO": return "Photo ajoutée 📸";
     case "VERIFICATION": return "Paiement vérification reçu ✅";
-    case "CLIENT_PASS": return "Pass Premium activé 💎";
-    case "REVEAL": return "Contact débloqué 📱";
   }
 }
 
@@ -373,7 +334,5 @@ function notificationBody(type: IntentType, amount: number): string {
     case "TIER_UPGRADE": return `Votre annonce est passée en tier supérieur (${fmt} FCFA reçu).`;
     case "SERVICE_PHOTO": return `Photo en attente de modération (${fmt} FCFA reçu).`;
     case "VERIFICATION": return `${fmt} FCFA reçus. Soumettez vos pièces d'identité pour finaliser la vérification.`;
-    case "CLIENT_PASS": return `Pass Premium activé. Révélations WhatsApp illimitées et navigation incognito.`;
-    case "REVEAL": return `${fmt} FCFA payés — le contact WhatsApp est débloqué.`;
   }
 }

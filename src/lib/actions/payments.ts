@@ -209,60 +209,8 @@ export async function initiateVerificationAction(input: {
   });
 }
 
-// =====================================================================
-// REVEAL — 1000 FCFA pour débloquer 1 contact WhatsApp (pay-per-reveal)
-// =====================================================================
-
-export async function initiateRevealAction(input: {
-  adId: string;
-  phone: string;
-}): Promise<InitPaymentResult> {
-  const session = await auth();
-  if (!session?.user) return err("Connectez-vous pour contacter une escort");
-  if (!(await rl(`reveal:${session.user.id}`)).success) return err("Trop de tentatives");
-
-  const ad = await prisma.ad.findUnique({
-    where: { id: input.adId },
-    select: { id: true, status: true },
-  });
-  if (!ad || ad.status !== "ACTIVE") return err("Annonce introuvable");
-
-  const amount = await getSettingNumber("pricing.reveal.amount", 1000);
-  return kpayOneShotPayment({
-    userId: session.user.id,
-    amount,
-    phone: input.phone,
-    intent: { type: "REVEAL", payload: { adId: input.adId, userId: session.user.id } },
-    description: `Contact escort (${amount} FCFA)`,
-  });
-}
-
-// =====================================================================
-// CLIENT PASS — 1000 FCFA / mois (cumulable 1, 3, 12 mois)
-// =====================================================================
-
-export async function initiateClientPassAction(input: {
-  months: 1 | 3 | 12;
-  phone: string;
-}): Promise<InitPaymentResult> {
-  const session = await auth();
-  if (!session?.user) return err("Non authentifié");
-  if (!(await rl(`pass:${session.user.id}`)).success) return err("Trop de tentatives");
-
-  const months = ([1, 3, 12].includes(input.months) ? input.months : 1) as 1 | 3 | 12;
-  const monthly = await getSettingNumber("pricing.clientpass.amount", 1000);
-  const daysPerMonth = await getSettingNumber("pricing.clientpass.days", 30);
-  const amount = monthly * months;
-  const days = daysPerMonth * months;
-
-  return kpayOneShotPayment({
-    userId: session.user.id,
-    amount,
-    phone: input.phone,
-    intent: {
-      type: "CLIENT_PASS",
-      payload: { userId: session.user.id, months, days },
-    },
-    description: `Pass Premium ${months} mois`,
-  });
-}
+// Note v3 (2026-06-11) : suppression des actions client-facing payantes :
+//   - initiateRevealAction (pay-per-contact) → contact WhatsApp désormais gratuit
+//   - initiateClientPassAction (Pass Premium client) → supprimé
+// Les seuls payeurs sur Affiniter sont maintenant les ESCORTES (abonnement mensuel
+// + options à la carte : Bump, Sticky, Photo service, Vérification, Diamond).

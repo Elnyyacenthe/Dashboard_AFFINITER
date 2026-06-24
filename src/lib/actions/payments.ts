@@ -233,9 +233,14 @@ export async function initiateEscortSubscriptionAction(input: {
   const fallback = input.tier === "VIP" ? 15000 : input.tier === "PREMIUM" ? 5000 : 2000;
   const monthly = await getSettingNumber(monthlyKey, fallback);
   const daysPerMonth = await getSettingNumber("pricing.escortSubscription.days", 30);
-  const amount = monthly * months;
+
+  // Réductions appliquées server-side (sécurité : pas de confiance dans le client)
+  const discountPercent = getSubscriptionDiscount(months);
+  const baseAmount = monthly * months;
+  const amount = Math.round(baseAmount * (1 - discountPercent / 100));
   const days = daysPerMonth * months;
 
+  const discountSuffix = discountPercent > 0 ? ` (-${discountPercent}%)` : "";
   return kpayOneShotPayment({
     userId: session.user.id,
     amount,
@@ -250,6 +255,13 @@ export async function initiateEscortSubscriptionAction(input: {
         autoRenew: input.autoRenew,
       },
     },
-    description: `Abonnement ${input.tier} ${months} mois`,
+    description: `Abonnement ${input.tier} ${months} mois${discountSuffix}`,
   });
+}
+
+/** Réductions appliquées sur les abonnements pluri-mois. */
+export function getSubscriptionDiscount(months: number): number {
+  if (months >= 12) return 15;
+  if (months >= 3) return 5;
+  return 0;
 }

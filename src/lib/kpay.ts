@@ -190,7 +190,6 @@ export async function initDeposit(input: InitDepositInput): Promise<KpayPayment>
 
   const body = {
     amount: input.amount,
-    currency: "XAF" as const,
     provider, // ⚠️ K-Pay attend `provider` (MTN_MOMO_CMR / ORANGE_CMR), pas `paymentMethod`
     phoneNumber: input.phoneNumber,
     externalId: input.externalId,
@@ -251,7 +250,6 @@ export async function initWithdrawal(input: InitWithdrawalInput): Promise<KpayPa
 
   const body = {
     amount: input.amount,
-    currency: "XAF" as const,
     provider, // ⚠️ K-Pay attend `provider`, pas `paymentMethod`
     phoneNumber: input.phoneNumber,
     description: input.description ?? `Retrait Affiniter de ${input.amount} FCFA`,

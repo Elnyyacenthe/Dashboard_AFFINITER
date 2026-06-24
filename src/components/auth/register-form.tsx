@@ -37,7 +37,7 @@ export function RegisterForm() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 font-display text-2xl">
           <Sparkles className="h-6 w-6 text-primary" />
-          Devenir escort sur Affiniter
+          Devenir escort sur Affinité
         </CardTitle>
         <CardDescription>
           Publiez vos annonces auprès de milliers de clients camerounais. Inscription gratuite,

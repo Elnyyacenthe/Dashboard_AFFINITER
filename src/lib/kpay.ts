@@ -15,7 +15,7 @@
  *   KPAY_API_KEY=kpay_live_xxx       (ou kpay_test_xxx en sandbox)
  *   KPAY_SECRET_KEY=...
  *   KPAY_WEBHOOK_SECRET=...          (optionnel, défense en profondeur)
- *   KPAY_CALLBACK_URL=https://affiniter.cm/api/webhooks/kpay
+ *   KPAY_CALLBACK_URL=https://affinité.com/api/webhooks/kpay
  */
 
 import crypto from "node:crypto";
@@ -193,7 +193,7 @@ export async function initDeposit(input: InitDepositInput): Promise<KpayPayment>
     provider, // ⚠️ K-Pay attend `provider` (MTN_MOMO_CMR / ORANGE_CMR), pas `paymentMethod`
     phoneNumber: input.phoneNumber,
     externalId: input.externalId,
-    description: input.description ?? `Dépôt de ${input.amount} FCFA sur Affiniter`,
+    description: input.description ?? `Dépôt de ${input.amount} FCFA sur Affinité`,
     ...(input.customerEmail && { customerEmail: input.customerEmail }),
     ...(input.customerName && { customerName: input.customerName }),
     ...(input.metadata && { metadata: input.metadata }),
@@ -252,7 +252,7 @@ export async function initWithdrawal(input: InitWithdrawalInput): Promise<KpayPa
     amount: input.amount,
     provider, // ⚠️ K-Pay attend `provider`, pas `paymentMethod`
     phoneNumber: input.phoneNumber,
-    description: input.description ?? `Retrait Affiniter de ${input.amount} FCFA`,
+    description: input.description ?? `Retrait Affinité de ${input.amount} FCFA`,
   };
 
   let resp: Response;

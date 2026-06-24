@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Flame, ShieldAlert, ExternalLink } from "lucide-react";
 import { SITE_NAME } from "@/lib/utils";
 
-const YAMO_URL = process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm";
+const YAMO_URL = process.env.NEXT_PUBLIC_AFFINITE_URL ?? "https://affinité.com";
 
 export function Footer() {
   return (
@@ -31,7 +31,7 @@ export function Footer() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
                 <a href={YAMO_URL} target="_blank" rel="noopener noreferrer" className="hover:text-foreground">
-                  <ExternalLink className="mr-1 inline h-3 w-3" /> Accueil affiniter.cm
+                  <ExternalLink className="mr-1 inline h-3 w-3" /> Accueil affinité.com
                 </a>
               </li>
               <li>

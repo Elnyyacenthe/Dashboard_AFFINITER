@@ -17,7 +17,7 @@ import type { Role } from "@prisma/client";
 export type AuthState =
   | {
       ok: true;
-      /** URL où le client doit naviguer après login (interne /admin OU externe dashboard.affiniter.cm). */
+      /** URL où le client doit naviguer après login (interne /admin OU externe dashboard.affinité.com). */
       redirectTo?: string;
       nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number };
     }

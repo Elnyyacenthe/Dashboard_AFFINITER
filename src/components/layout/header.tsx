@@ -63,7 +63,7 @@ export async function Header() {
               className="hidden sm:inline-flex"
             >
               <a
-                href={`${process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm"}/poster-une-annonce`}
+                href={`${process.env.NEXT_PUBLIC_AFFINITE_URL ?? "https://affinité.com"}/poster-une-annonce`}
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -138,8 +138,8 @@ export async function Header() {
                       <DropdownMenuItem asChild>
                         <a
                           href={
-                            process.env.NEXT_PUBLIC_AFFINITER_ADMIN_URL ??
-                            `${process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm"}/admin`
+                            process.env.NEXT_PUBLIC_AFFINITE_ADMIN_URL ??
+                            `${process.env.NEXT_PUBLIC_AFFINITE_URL ?? "https://affinité.com"}/admin`
                           }
                           target="_blank"
                           rel="noopener noreferrer"

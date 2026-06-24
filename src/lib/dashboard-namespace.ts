@@ -2,17 +2,17 @@ import type { Role } from "@prisma/client";
 
 /**
  * URL externe vers le back-office admin (yamo-dashboard).
- * Configurable via NEXT_PUBLIC_DASHBOARD_URL ; à défaut, https://dashboard.affiniter.cm.
+ * Configurable via NEXT_PUBLIC_DASHBOARD_URL ; à défaut, https://dashboard.affinité.com.
  */
 function getDashboardExternalUrl(): string {
-  return process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "https://dashboard.affiniter.cm";
+  return process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "https://dashboard.affinité.com";
 }
 
 /**
  * Retourne la destination après login selon le rôle.
  *
  * Architecture v2 (depuis 2026) : escort/client sont intégrés à yamo (interne).
- * Seul l'admin est externe (yamo-dashboard / dashboard.affiniter.cm).
+ * Seul l'admin est externe (yamo-dashboard / dashboard.affinité.com).
  *
  *   - ADMIN / MODERATOR → URL externe back-office
  *   - ESCORT            → /escort/dashboard (interne yamo)

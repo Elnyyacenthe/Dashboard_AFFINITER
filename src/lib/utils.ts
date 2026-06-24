@@ -61,5 +61,5 @@ export async function hashString(input: string): Promise<string> {
     .join("");
 }
 
-export const SITE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Affiniter";
+export const SITE_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Affinité";
 export const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

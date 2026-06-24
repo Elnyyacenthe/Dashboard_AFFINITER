@@ -215,7 +215,7 @@ function EmptyState() {
           </p>
         </div>
         <Button asChild>
-          <Link href={process.env.NEXT_PUBLIC_AFFINITER_URL ?? "/"} target={process.env.NEXT_PUBLIC_AFFINITER_URL ? "_blank" : undefined}>
+          <Link href={process.env.NEXT_PUBLIC_AFFINITE_URL ?? "/"} target={process.env.NEXT_PUBLIC_AFFINITE_URL ? "_blank" : undefined}>
             <Search className="h-4 w-4" /> Parcourir les annonces
           </Link>
         </Button>

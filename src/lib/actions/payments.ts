@@ -56,7 +56,7 @@ export async function initiateBumpAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "BUMP", payload: { adId: input.adId } },
-    description: `AFFINITER - Bump annonce`,
+    description: `AFFINITE - Bump annonce`,
   });
 }
 
@@ -86,7 +86,7 @@ export async function initiateStickyAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "STICKY", payload: { adId: input.adId, hours } },
-    description: `AFFINITER - Sticky annonce ${hours}h`,
+    description: `AFFINITE - Sticky annonce ${hours}h`,
   });
 }
 
@@ -146,7 +146,7 @@ export async function initiateTierUpgradeAction(input: {
       type: "TIER_UPGRADE",
       payload: { adId: input.adId, tier: input.tier, days, autoRenew: input.autoRenew },
     },
-    description: `AFFINITER - Annonce ${input.tier} ${days}j`,
+    description: `AFFINITE - Annonce ${input.tier} ${days}j`,
   });
 }
 
@@ -184,7 +184,7 @@ export async function initiateServicePhotoAction(input: {
       type: "SERVICE_PHOTO",
       payload: { adId: input.adId, url: input.url, imageHash: dup.imageHash },
     },
-    description: `AFFINITER - Photo service annonce`,
+    description: `AFFINITE - Photo service annonce`,
   });
 }
 
@@ -205,12 +205,12 @@ export async function initiateVerificationAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "VERIFICATION", payload: { userId: session.user.id } },
-    description: `AFFINITER - Verification identite`,
+    description: `AFFINITE - Verification identite`,
   });
 }
 
 // Note v3 (2026-06-11) : suppression des actions client-facing payantes.
-// Les seuls payeurs sur Affiniter sont maintenant les ESCORTES (abonnement mensuel
+// Les seuls payeurs sur Affinité sont maintenant les ESCORTES (abonnement mensuel
 // + options à la carte : Bump, Sticky, Photo service, Vérification, Diamond).
 
 // =====================================================================
@@ -255,7 +255,7 @@ export async function initiateEscortSubscriptionAction(input: {
         autoRenew: input.autoRenew,
       },
     },
-    description: `AFFINITER - Abonnement ${input.tier} ${months} mois${discountSuffix}`,
+    description: `AFFINITE - Abonnement ${input.tier} ${months} mois${discountSuffix}`,
   });
 }
 

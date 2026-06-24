@@ -104,8 +104,8 @@ export async function adminCreateEscortAction(
     await tx.notification.create({
       data: {
         userId: user.id,
-        title: "Bienvenue sur Affiniter 🎉",
-        body: `Votre compte a été créé par l'équipe Affiniter avec un abonnement ${data.tier} actif jusqu'au ${until.toLocaleDateString("fr-FR")}. Connectez-vous pour publier votre première annonce.`,
+        title: "Bienvenue sur Affinité 🎉",
+        body: `Votre compte a été créé par l'équipe Affinité avec un abonnement ${data.tier} actif jusqu'au ${until.toLocaleDateString("fr-FR")}. Connectez-vous pour publier votre première annonce.`,
         link: "/escort/dashboard",
       },
     });
@@ -171,7 +171,7 @@ export async function adminActivateSubscriptionAction(input: {
     data: {
       userId: input.userId,
       title: "Abonnement activé par l'équipe ✨",
-      body: `L'équipe Affiniter a activé votre abonnement ${input.tier} jusqu'au ${until.toLocaleDateString("fr-FR")}.`,
+      body: `L'équipe Affinité a activé votre abonnement ${input.tier} jusqu'au ${until.toLocaleDateString("fr-FR")}.`,
       link: "/escort/abonnement",
     },
   });

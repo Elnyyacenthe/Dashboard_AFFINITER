@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     default: `${SITE_NAME} — Back-office`,
     template: `%s · ${SITE_NAME} Admin`,
   },
-  description: "Back-office Affiniter (admin + dev + service client).",
+  description: "Back-office Affinité (admin + dev + service client).",
   robots: { index: false, follow: false },
   icons: {
     icon: [{ url: "/icon.svg", type: "image/svg+xml" }],

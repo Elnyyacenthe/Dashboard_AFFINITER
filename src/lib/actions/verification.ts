@@ -47,7 +47,7 @@ export async function submitVerificationAction(input: unknown): Promise<Verifica
     });
     return {
       ok: false,
-      error: "Cette identité a été bannie définitivement de Affiniter.",
+      error: "Cette identité a été bannie définitivement de Affinité.",
     };
   }
 

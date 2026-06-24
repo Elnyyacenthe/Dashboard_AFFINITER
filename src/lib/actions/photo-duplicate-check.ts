@@ -41,7 +41,7 @@ export async function checkPhotoDuplicate(
   if (exact) {
     return {
       ok: false,
-      reason: "Cette photo est déjà publiée sur Affiniter par un autre annonceur.",
+      reason: "Cette photo est déjà publiée sur Affinité par un autre annonceur.",
       conflictAdId: exact.adId,
       distance: 0,
     };
@@ -66,7 +66,7 @@ export async function checkPhotoDuplicate(
       if (d <= DUPLICATE_THRESHOLD) {
         return {
           ok: false,
-          reason: `Cette photo ressemble fortement à une autre déjà publiée sur Affiniter (similarité ${Math.round(((64 - d) / 64) * 100)}%).`,
+          reason: `Cette photo ressemble fortement à une autre déjà publiée sur Affinité (similarité ${Math.round(((64 - d) / 64) * 100)}%).`,
           conflictAdId: m.adId,
           distance: d,
         };

@@ -21,10 +21,10 @@ export default async function AccountPage({ backUrl = "/compte" }: { backUrl?: s
   });
   if (!user) redirect("/connexion");
 
-  // Pour les ADMIN/MODERATOR, lien externe vers affiniter.cm/admin (cf. dashboard-namespace.ts)
+  // Pour les ADMIN/MODERATOR, lien externe vers affinité.com/admin (cf. dashboard-namespace.ts)
   const yamoAdminUrl =
-    process.env.NEXT_PUBLIC_AFFINITER_ADMIN_URL ??
-    `${process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm"}/admin`;
+    process.env.NEXT_PUBLIC_AFFINITE_ADMIN_URL ??
+    `${process.env.NEXT_PUBLIC_AFFINITE_URL ?? "https://affinité.com"}/admin`;
   const dashboardLink =
     user.role === "ADMIN" || user.role === "MODERATOR"
       ? yamoAdminUrl
@@ -80,7 +80,7 @@ export default async function AccountPage({ backUrl = "/compte" }: { backUrl?: s
           <h3 className="font-semibold text-destructive">Zone dangereuse</h3>
           <p className="text-xs text-muted-foreground">
             Pour modifier votre email, téléphone ou supprimer votre compte, contactez le support à
-            support@affiniter.cm.
+            support@affinité.com.
           </p>
         </CardContent>
       </Card>

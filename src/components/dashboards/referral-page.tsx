@@ -49,7 +49,7 @@ export default async function ReferralPage({ backUrl = "/parrainage" }: { backUr
           <Gift className="mr-2 inline h-7 w-7 text-primary" /> Parrainage
         </h1>
         <p className="text-muted-foreground">
-          Gagnez de l'argent à chaque ami que vous parrainez sur Affiniter.
+          Gagnez de l'argent à chaque ami que vous parrainez sur Affinité.
         </p>
       </div>
 

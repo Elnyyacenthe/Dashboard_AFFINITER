@@ -354,7 +354,7 @@ function notificationTitle(type: IntentType): string {
     case "TIER_UPGRADE": return "Abonnement activé ⭐";
     case "SERVICE_PHOTO": return "Photo ajoutée 📸";
     case "VERIFICATION": return "Paiement vérification reçu ✅";
-    case "ESCORT_SUBSCRIPTION": return "Abonnement Affiniter activé 🎉";
+    case "ESCORT_SUBSCRIPTION": return "Abonnement Affinité activé 🎉";
   }
 }
 

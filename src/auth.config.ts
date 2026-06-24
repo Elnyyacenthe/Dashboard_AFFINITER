@@ -17,7 +17,7 @@ export const authConfig = {
       const role = auth?.user?.role;
 
       // Ce dashboard ne contient PAS l'interface admin. Les ADMIN/MODERATOR
-      // sont renvoyés sur la home (`/`) qui les redirige vers affiniter.cm/admin externe.
+      // sont renvoyés sur la home (`/`) qui les redirige vers affinité.com/admin externe.
       const isOnEscort = nextUrl.pathname.startsWith("/escort");
       const isOnClient = nextUrl.pathname.startsWith("/client");
       const isOnAuth =

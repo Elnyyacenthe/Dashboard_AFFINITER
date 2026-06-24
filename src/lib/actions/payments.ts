@@ -56,7 +56,7 @@ export async function initiateBumpAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "BUMP", payload: { adId: input.adId } },
-    description: `Bump "${ad.title}"`,
+    description: `AFFINITER - Bump annonce`,
   });
 }
 
@@ -86,7 +86,7 @@ export async function initiateStickyAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "STICKY", payload: { adId: input.adId, hours } },
-    description: `Sticky ${hours}h "${ad.title}"`,
+    description: `AFFINITER - Sticky annonce ${hours}h`,
   });
 }
 
@@ -146,7 +146,7 @@ export async function initiateTierUpgradeAction(input: {
       type: "TIER_UPGRADE",
       payload: { adId: input.adId, tier: input.tier, days, autoRenew: input.autoRenew },
     },
-    description: `${input.tier} ${days}j`,
+    description: `AFFINITER - Annonce ${input.tier} ${days}j`,
   });
 }
 
@@ -184,7 +184,7 @@ export async function initiateServicePhotoAction(input: {
       type: "SERVICE_PHOTO",
       payload: { adId: input.adId, url: input.url, imageHash: dup.imageHash },
     },
-    description: `Photo service "${ad.title}"`,
+    description: `AFFINITER - Photo service annonce`,
   });
 }
 
@@ -205,7 +205,7 @@ export async function initiateVerificationAction(input: {
     amount,
     phone: input.phone,
     intent: { type: "VERIFICATION", payload: { userId: session.user.id } },
-    description: "Vérification d'identité",
+    description: `AFFINITER - Verification identite`,
   });
 }
 
@@ -255,7 +255,7 @@ export async function initiateEscortSubscriptionAction(input: {
         autoRenew: input.autoRenew,
       },
     },
-    description: `Abonnement ${input.tier} ${months} mois${discountSuffix}`,
+    description: `AFFINITER - Abonnement ${input.tier} ${months} mois${discountSuffix}`,
   });
 }
 

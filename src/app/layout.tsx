@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
 
 import { SITE_NAME, SITE_URL } from "@/lib/utils";
 import { Providers } from "@/components/providers";
 
-import "./globals.css";
+// Fonts servies en local depuis @fontsource-variable (plus de fetch Google Fonts)
+import "@fontsource-variable/inter";
+import "@fontsource-variable/playfair-display";
 
-const sans = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const display = Playfair_Display({ subsets: ["latin"], variable: "--font-display" });
+import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" suppressHydrationWarning className={`${sans.variable} ${display.variable}`}>
+    <html lang="fr" suppressHydrationWarning>
       <body>
         <Providers>
           {children}

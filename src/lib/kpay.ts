@@ -51,24 +51,47 @@ const HEADERS_BASE = () => {
 // Types
 // =====================================================================
 
+/** Statuts officiels K-Pay (cf. doc) — l'API renvoie ces 6 valeurs. */
 export type KpayStatus =
   | "PENDING"
+  | "PROCESSING"
   | "COMPLETED"
-  | "SUCCESS"
   | "FAILED"
   | "CANCELLED"
+  | "SUBMITTED"
+  // Alias rétro-compat
+  | "SUCCESS"
   | "REJECTED"
   | "EXPIRED";
 
+/** Failure reasons documentées par K-Pay. */
+export type KpayFailureReason =
+  | "PAYER_LIMIT_REACHED"
+  | "PAYER_NOT_FOUND"
+  | "PAYMENT_NOT_APPROVED"
+  | "RECIPIENT_NOT_FOUND"
+  | "UNSPECIFIED_FAILURE";
+
 export interface KpayPayment {
   id: string;
+  reference?: string;
+  providerReference?: string;
   status: KpayStatus;
   amount: number;
+  /** Montant net effectivement crédité (après frais K-Pay) — calculé par K-Pay. */
+  netAmount?: number;
+  /** Frais K-Pay prélevés sur le montant brut. */
+  feeAmount?: number;
+  currency?: string;
+  provider?: KpayProvider;
+  country?: string;
   phoneNumber: string;
   externalId: string;
   description?: string;
-  failureReason?: string;
+  failureReason?: KpayFailureReason | string;
+  isTest?: boolean;
   createdAt?: string;
+  completedAt?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -80,15 +103,15 @@ export interface InitDepositInput {
   customerEmail?: string;
   customerName?: string;
   metadata?: Record<string, unknown>;
-  /** Si non fourni, détecté automatiquement depuis le numéro. */
-  paymentMethod?: KpayPaymentMethod;
+  /** Code provider K-Pay (cf. doc). Si non fourni, détecté depuis le numéro. */
+  provider?: KpayProvider;
 }
 
 export interface InitWithdrawalInput {
   amount: number;
   phoneNumber: string;
   description?: string;
-  paymentMethod?: KpayPaymentMethod;
+  provider?: KpayProvider;
 }
 
 // =====================================================================
@@ -105,6 +128,15 @@ export function normalizePhoneForKpay(phone: string): string {
 }
 
 /**
+ * Codes provider K-Pay officiels (cf. doc /documentation/paiements).
+ * Format : OPERATEUR_COUNTRY (CMR = Cameroun).
+ */
+export type KpayProvider = "MTN_MOMO_CMR" | "ORANGE_CMR";
+
+/** Alias rétro-compat — déprécié, utiliser KpayProvider. */
+export type KpayPaymentMethod = KpayProvider;
+
+/**
  * Détecte l'opérateur (MTN ou Orange) à partir d'un numéro Cameroun normalisé.
  *
  * Plages actuelles (CRTC Cameroun) :
@@ -113,29 +145,25 @@ export function normalizePhoneForKpay(phone: string): string {
  *
  * En cas d'ambiguïté ou de prefix inconnu → MTN par défaut (couverture la plus large).
  */
-export type KpayPaymentMethod = "MTN_MONEY" | "ORANGE_MONEY";
-
-export function detectPaymentMethod(phone: string): KpayPaymentMethod {
+export function detectProvider(phone: string): KpayProvider {
   const normalized = normalizePhoneForKpay(phone);
-  // On s'attend à un numéro de 12 chiffres commençant par 237
-  if (!normalized.startsWith("237") || normalized.length !== 12) return "MTN_MONEY";
+  if (!normalized.startsWith("237") || normalized.length !== 12) return "MTN_MOMO_CMR";
 
-  const prefix2 = normalized.slice(3, 5); // 2 chiffres après 237
-  const prefix3 = normalized.slice(3, 6); // 3 chiffres après 237
+  const prefix2 = normalized.slice(3, 5);
+  const prefix3 = normalized.slice(3, 6);
 
-  // MTN : 67X, 68X
-  if (prefix2 === "67" || prefix2 === "68") return "MTN_MONEY";
-  // Orange : 69X
-  if (prefix2 === "69") return "ORANGE_MONEY";
-  // 650-654 → MTN, 655-659 → Orange
+  if (prefix2 === "67" || prefix2 === "68") return "MTN_MOMO_CMR";
+  if (prefix2 === "69") return "ORANGE_CMR";
   if (prefix3.startsWith("65")) {
     const last = Number(prefix3[2]);
-    if (last >= 0 && last <= 4) return "MTN_MONEY";
-    if (last >= 5 && last <= 9) return "ORANGE_MONEY";
+    if (last >= 0 && last <= 4) return "MTN_MOMO_CMR";
+    if (last >= 5 && last <= 9) return "ORANGE_CMR";
   }
-  // Fallback
-  return "MTN_MONEY";
+  return "MTN_MOMO_CMR";
 }
+
+/** @deprecated Utiliser detectProvider(). */
+export const detectPaymentMethod = detectProvider;
 
 /** ID externe unique pour idempotence côté K-Pay et anti-double-paiement. */
 export function makeExternalId(prefix: string, userId: string): string {
@@ -157,14 +185,15 @@ export function isKpayConfigured(): boolean {
  * qui valide depuis son app MoMo/Orange. Retourne l'id K-Pay (pay_xxx).
  */
 export async function initDeposit(input: InitDepositInput): Promise<KpayPayment> {
-  // Auto-détection du paymentMethod si pas fourni explicitement
-  const paymentMethod = input.paymentMethod ?? detectPaymentMethod(input.phoneNumber);
+  // Auto-détection du provider si pas fourni explicitement
+  const provider = input.provider ?? detectProvider(input.phoneNumber);
 
   const body = {
     amount: input.amount,
+    currency: "XAF" as const,
+    provider, // ⚠️ K-Pay attend `provider` (MTN_MOMO_CMR / ORANGE_CMR), pas `paymentMethod`
     phoneNumber: input.phoneNumber,
     externalId: input.externalId,
-    paymentMethod,
     description: input.description ?? `Dépôt de ${input.amount} FCFA sur Affiniter`,
     ...(input.customerEmail && { customerEmail: input.customerEmail }),
     ...(input.customerName && { customerName: input.customerName }),
@@ -218,12 +247,13 @@ export async function getDepositStatus(paymentId: string): Promise<KpayPayment> 
 // =====================================================================
 
 export async function initWithdrawal(input: InitWithdrawalInput): Promise<KpayPayment> {
-  const paymentMethod = input.paymentMethod ?? detectPaymentMethod(input.phoneNumber);
+  const provider = input.provider ?? detectProvider(input.phoneNumber);
 
   const body = {
     amount: input.amount,
+    currency: "XAF" as const,
+    provider, // ⚠️ K-Pay attend `provider`, pas `paymentMethod`
     phoneNumber: input.phoneNumber,
-    paymentMethod,
     description: input.description ?? `Retrait Affiniter de ${input.amount} FCFA`,
   };
 
@@ -299,7 +329,22 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
 /** Helper : qualifie un statut K-Pay en succès / échec / pending. */
 export function classifyStatus(status: string): "SUCCESS" | "FAILED" | "PENDING" {
   const s = status.toUpperCase();
+  // Statuts terminaux SUCCESS
   if (s === "COMPLETED" || s === "SUCCESS") return "SUCCESS";
+  // Statuts terminaux FAILED
   if (["FAILED", "EXPIRED", "CANCELLED", "REJECTED"].includes(s)) return "FAILED";
+  // Statuts intermédiaires (PENDING, PROCESSING, SUBMITTED) → on continue le polling
   return "PENDING";
+}
+
+/** Mapping français des failure reasons K-Pay (pour notifs utilisateur). */
+export function explainFailureReason(reason?: string | null): string {
+  switch (reason) {
+    case "PAYER_LIMIT_REACHED": return "Plafond Mobile Money atteint pour ce numéro.";
+    case "PAYER_NOT_FOUND":     return "Numéro Mobile Money introuvable ou inactif.";
+    case "PAYMENT_NOT_APPROVED":return "Paiement refusé par le client (PIN incorrect ou annulation).";
+    case "RECIPIENT_NOT_FOUND": return "Numéro destinataire introuvable (pour les retraits).";
+    case "UNSPECIFIED_FAILURE": return "Erreur Mobile Money non spécifiée. Réessayez.";
+    default:                    return reason ? `Erreur K-Pay : ${reason}` : "Paiement non abouti.";
+  }
 }

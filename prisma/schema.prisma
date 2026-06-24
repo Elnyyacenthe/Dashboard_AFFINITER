@@ -152,6 +152,15 @@ enum IdDocType {
   DRIVING_LICENSE
 }
 
+/// v12 — Tier d'abonnement mensuel pour les escortes.
+/// NONE = pas d'abonnement → ne peut pas publier d'annonce.
+enum EscortSubscriptionTier {
+  NONE
+  STANDARD
+  PREMIUM
+  VIP
+}
+
 // =====================================================================
 // AUTH (NextAuth v5 / Auth.js)
 // =====================================================================
@@ -170,7 +179,12 @@ model User {
   banReason     String?
   lastLoginAt   DateTime?
 
-  // === Wallet & Parrainage ===
+  // === v12 — Abonnement mensuel escort ===
+  escortSubscriptionTier       EscortSubscriptionTier @default(NONE)
+  escortSubscriptionUntil      DateTime?
+  escortSubscriptionAutoRenew  Boolean                @default(false)
+
+  // === Wallet & Parrainage (legacy, à drop en v9) ===
   walletBalance     Int       @default(0)          // Solde en FCFA
   referralCode      String?   @unique               // Code parrainage unique YAMO-XXXX
   referredById      String?                          // Qui m'a parrainé
@@ -209,6 +223,7 @@ model User {
   @@index([referralCode])
   @@index([referredById])
   @@index([identityHash])
+  @@index([escortSubscriptionUntil])
 }
 
 model Account {

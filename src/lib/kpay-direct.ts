@@ -23,7 +23,8 @@ export type PaymentIntent =
   | { type: "STICKY"; payload: { adId: string; hours: number } }
   | { type: "TIER_UPGRADE"; payload: { adId: string; tier: "PREMIUM" | "VIP" | "DIAMOND"; days: number; autoRenew?: boolean } }
   | { type: "SERVICE_PHOTO"; payload: { adId: string; url: string; imageHash?: string } }
-  | { type: "VERIFICATION"; payload: { userId: string } };
+  | { type: "VERIFICATION"; payload: { userId: string } }
+  | { type: "ESCORT_SUBSCRIPTION"; payload: { userId: string; tier: "STANDARD" | "PREMIUM" | "VIP"; months: number; days: number; autoRenew?: boolean } };
 
 export type IntentType = PaymentIntent["type"];
 
@@ -284,6 +285,35 @@ export async function applyIntent(paymentId: string): Promise<void> {
         // Le client redirige ensuite l'user vers le formulaire KYC.
         break;
       }
+      case "ESCORT_SUBSCRIPTION": {
+        // Active ou prolonge l'abonnement mensuel escort.
+        const user = await tx.user.findUnique({
+          where: { id: intent.payload.userId },
+          select: { escortSubscriptionUntil: true, role: true },
+        });
+        const now = new Date();
+        const base = user?.escortSubscriptionUntil && user.escortSubscriptionUntil > now
+          ? user.escortSubscriptionUntil
+          : now;
+        const newUntil = new Date(base.getTime() + intent.payload.days * 86_400_000);
+        await tx.user.update({
+          where: { id: intent.payload.userId },
+          data: {
+            escortSubscriptionTier: intent.payload.tier,
+            escortSubscriptionUntil: newUntil,
+            // Passe automatiquement en ESCORT si encore CLIENT
+            ...(user?.role === "CLIENT" && { role: "ESCORT" }),
+            ...(intent.payload.autoRenew !== undefined && {
+              escortSubscriptionAutoRenew: intent.payload.autoRenew,
+            }),
+          },
+        });
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: { durationDays: intent.payload.days },
+        });
+        break;
+      }
     }
 
     // Notif user
@@ -313,6 +343,7 @@ function defaultDescription(intent: PaymentIntent, amount: number): string {
     case "TIER_UPGRADE": return `${intent.payload.tier} ${intent.payload.days}j (${amount} FCFA)`;
     case "SERVICE_PHOTO": return `Photo service (${amount} FCFA)`;
     case "VERIFICATION": return `Vérification d'identité (${amount} FCFA)`;
+    case "ESCORT_SUBSCRIPTION": return `Abonnement ${intent.payload.tier} ${intent.payload.months} mois (${amount} FCFA)`;
   }
 }
 
@@ -323,6 +354,7 @@ function notificationTitle(type: IntentType): string {
     case "TIER_UPGRADE": return "Abonnement activé ⭐";
     case "SERVICE_PHOTO": return "Photo ajoutée 📸";
     case "VERIFICATION": return "Paiement vérification reçu ✅";
+    case "ESCORT_SUBSCRIPTION": return "Abonnement Affiniter activé 🎉";
   }
 }
 
@@ -334,5 +366,6 @@ function notificationBody(type: IntentType, amount: number): string {
     case "TIER_UPGRADE": return `Votre annonce est passée en tier supérieur (${fmt} FCFA reçu).`;
     case "SERVICE_PHOTO": return `Photo en attente de modération (${fmt} FCFA reçu).`;
     case "VERIFICATION": return `${fmt} FCFA reçus. Soumettez vos pièces d'identité pour finaliser la vérification.`;
+    case "ESCORT_SUBSCRIPTION": return `${fmt} FCFA reçus. Vous pouvez maintenant publier vos annonces.`;
   }
 }

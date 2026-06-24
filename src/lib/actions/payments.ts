@@ -209,8 +209,47 @@ export async function initiateVerificationAction(input: {
   });
 }
 
-// Note v3 (2026-06-11) : suppression des actions client-facing payantes :
-//   - initiateRevealAction (pay-per-contact) → contact WhatsApp désormais gratuit
-//   - initiateClientPassAction (Pass Premium client) → supprimé
+// Note v3 (2026-06-11) : suppression des actions client-facing payantes.
 // Les seuls payeurs sur Affiniter sont maintenant les ESCORTES (abonnement mensuel
 // + options à la carte : Bump, Sticky, Photo service, Vérification, Diamond).
+
+// =====================================================================
+// ESCORT SUBSCRIPTION — abonnement mensuel obligatoire pour publier
+// =====================================================================
+
+export async function initiateEscortSubscriptionAction(input: {
+  tier: "STANDARD" | "PREMIUM" | "VIP";
+  months: 1 | 3 | 12;
+  autoRenew?: boolean;
+  phone: string;
+}): Promise<InitPaymentResult> {
+  const session = await auth();
+  if (!session?.user) return err("Non authentifié");
+  if (!(await rl(`escortsub:${session.user.id}`)).success) return err("Trop de tentatives");
+
+  const months = ([1, 3, 12].includes(input.months) ? input.months : 1) as 1 | 3 | 12;
+  const tierKey = input.tier.toLowerCase();
+  const monthlyKey = `pricing.escortSubscription.${tierKey}.amount`;
+  const fallback = input.tier === "VIP" ? 15000 : input.tier === "PREMIUM" ? 5000 : 2000;
+  const monthly = await getSettingNumber(monthlyKey, fallback);
+  const daysPerMonth = await getSettingNumber("pricing.escortSubscription.days", 30);
+  const amount = monthly * months;
+  const days = daysPerMonth * months;
+
+  return kpayOneShotPayment({
+    userId: session.user.id,
+    amount,
+    phone: input.phone,
+    intent: {
+      type: "ESCORT_SUBSCRIPTION",
+      payload: {
+        userId: session.user.id,
+        tier: input.tier,
+        months,
+        days,
+        autoRenew: input.autoRenew,
+      },
+    },
+    description: `Abonnement ${input.tier} ${months} mois`,
+  });
+}

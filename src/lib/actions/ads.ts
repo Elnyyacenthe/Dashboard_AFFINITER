@@ -112,6 +112,13 @@ export async function createAdAction(
     };
   }
 
+  // v12 — Guard abonnement : refus si pas d'abonnement actif (sauf ADMIN)
+  if (session.user.role === "ESCORT") {
+    const { canEscortPublish } = await import("@/lib/escort-subscription");
+    const guard = await canEscortPublish(session.user.id);
+    if (!guard.ok) return { ok: false, error: guard.reason };
+  }
+
   // Construction de l'objet brut depuis FormData
   const raw = {
     title: formData.get("title"),
@@ -162,12 +169,17 @@ export async function createAdAction(
   const photoUrls = formData.getAll("mediaUrls").map(String).filter(Boolean);
   const videoUrls = formData.getAll("videoUrls").map(String).filter(Boolean);
 
-  // I6 — Cap photos selon le tier (annonce nouvelle = STANDARD au départ)
-  const photoCap = await getSettingNumber("photos.cap.standard", 3);
+  // v12 — Cap photos selon l'abonnement escort (Standard/Premium/VIP)
+  let photoCap = await getSettingNumber("photos.cap.standard", 3); // fallback ADMIN
+  if (session.user.role === "ESCORT") {
+    const { getEscortSubscriptionStatus } = await import("@/lib/escort-subscription");
+    const sub = await getEscortSubscriptionStatus(session.user.id);
+    photoCap = sub.caps.photos;
+  }
   if (photoUrls.length > photoCap) {
     return {
       ok: false,
-      error: `Limite photos atteinte : ${photoCap} max en plan Standard. Passez en Premium ou VIP pour en publier plus.`,
+      error: `Limite photos atteinte : ${photoCap} max pour votre abonnement. Upgradez vers un tier supérieur.`,
     };
   }
 

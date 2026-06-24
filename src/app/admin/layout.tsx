@@ -46,6 +46,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               { href: "/admin/verifications", label: "Vérifications ID", icon: <BadgeCheck className="h-4 w-4" />, badge: pendingVerifs },
               { href: "/admin/annonces", label: "Toutes les annonces", icon: <ListChecks className="h-4 w-4" /> },
               { href: "/admin/utilisateurs", label: "Utilisateurs", icon: <Users className="h-4 w-4" /> },
+              { href: "/admin/escortes-onboarding", label: "✨ Onboarding escort", icon: <Users className="h-4 w-4" /> },
               { href: "/admin/villes", label: "Villes", icon: <MapPin className="h-4 w-4" /> },
               { href: "/admin/signalements", label: "Signalements", icon: <Flag className="h-4 w-4" />, badge: openReports },
               { href: "/admin/paiements", label: "Paiements", icon: <CreditCard className="h-4 w-4" /> },

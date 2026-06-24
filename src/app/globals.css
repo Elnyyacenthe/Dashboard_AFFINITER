@@ -57,6 +57,9 @@
   }
   html {
     color-scheme: dark;
+    -webkit-text-size-adjust: 100%; /* iOS : empêche le browser de gonfler le texte en mode paysage */
+    text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
   body {
     @apply bg-background text-foreground antialiased;
@@ -64,10 +67,47 @@
       radial-gradient(ellipse 80% 50% at 50% -20%, hsl(var(--primary) / 0.15), transparent),
       radial-gradient(ellipse 60% 40% at 100% 100%, hsl(var(--accent) / 0.08), transparent);
     background-attachment: fixed;
+    overflow-x: hidden; /* Empêche le scroll horizontal qui apparaît si un enfant déborde */
+    min-width: 320px;   /* Largeur minimale supportée (iPhone SE) */
+  }
+
+  /* Toutes les images / vidéos restent dans leur conteneur */
+  img, video, svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Bloque les tables qui débordent → on les rend scrollables individuellement */
+  table {
+    max-width: 100%;
+    display: block;
+    overflow-x: auto;
+  }
+
+  /* Tap target minimum 44px sur tactile (WCAG) — boutons et liens */
+  @media (pointer: coarse) {
+    button, a, [role="button"] {
+      min-height: 44px;
+    }
   }
 
   ::selection {
     @apply bg-primary/40 text-foreground;
+  }
+
+  /* Clamp automatique des gros titres sur mobile (anti "trop gros pour l'écran") */
+  @media (max-width: 640px) {
+    .text-7xl { font-size: 3.5rem; line-height: 1.05; }
+    .text-6xl { font-size: 2.75rem; line-height: 1.05; }
+    .text-5xl { font-size: 2.25rem; line-height: 1.1; }
+    .text-4xl { font-size: 1.875rem; line-height: 1.15; }
+  }
+
+  /* Garde-fou contre les éléments qui débordent */
+  pre, code {
+    max-width: 100%;
+    overflow-x: auto;
+    word-wrap: break-word;
   }
 }
 
@@ -86,6 +126,9 @@
     border-radius: inherit;
     background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
     -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
       linear-gradient(#000 0 0) content-box,
       linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;

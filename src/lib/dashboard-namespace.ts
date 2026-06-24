@@ -1,31 +1,32 @@
 import type { Role } from "@prisma/client";
 
 /**
- * URL externe vers l'interface admin (hébergée dans le projet Affiniter principal).
- * Configurable via NEXT_PUBLIC_AFFINITER_ADMIN_URL ; à défaut, dérivée de NEXT_PUBLIC_AFFINITER_URL.
+ * URL externe vers le back-office admin (yamo-dashboard).
+ * Configurable via NEXT_PUBLIC_DASHBOARD_URL ; à défaut, https://dashboard.affiniter.cm.
  */
-function getAdminExternalUrl(): string {
-  const adminUrl = process.env.NEXT_PUBLIC_AFFINITER_ADMIN_URL;
-  if (adminUrl) return adminUrl;
-  const yamoUrl = process.env.NEXT_PUBLIC_AFFINITER_URL ?? "https://affiniter.cm";
-  return `${yamoUrl}/admin`;
+function getDashboardExternalUrl(): string {
+  return process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "https://dashboard.affiniter.cm";
 }
 
 /**
- * Retourne le namespace de dashboard selon le rôle :
- *   - ADMIN/MODERATOR → URL externe vers affiniter.cm/admin
- *   - ESCORT          → "/escort"
- *   - CLIENT          → "/client"
+ * Retourne la destination après login selon le rôle.
  *
- * Note : ce dashboard ne contient pas l'interface admin (déplacée dans le projet Affiniter principal).
+ * Architecture v2 (depuis 2026) : escort/client sont intégrés à yamo (interne).
+ * Seul l'admin est externe (yamo-dashboard / dashboard.affiniter.cm).
+ *
+ *   - ADMIN / MODERATOR → URL externe back-office
+ *   - ESCORT            → /escort/dashboard (interne yamo)
+ *   - CLIENT            → /client (interne yamo)
  */
 export function getDashboardNamespace(role: Role): string {
-  if (role === "ADMIN" || role === "MODERATOR") return getAdminExternalUrl();
-  if (role === "ESCORT") return "/escort";
+  if (role === "ADMIN" || role === "MODERATOR") {
+    return `${getDashboardExternalUrl()}/admin`;
+  }
+  if (role === "ESCORT") return "/escort/dashboard";
   return "/client";
 }
 
-/** Indique si une chaîne est une URL absolue (commence par http[s]://). */
+/** Indique si une chaîne est une URL absolue (http[s]://…). */
 export function isExternalUrl(url: string): boolean {
   return /^https?:\/\//i.test(url);
 }

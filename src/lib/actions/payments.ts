@@ -235,7 +235,7 @@ export async function initiateEscortSubscriptionAction(input: {
   const daysPerMonth = await getSettingNumber("pricing.escortSubscription.days", 30);
 
   // Réductions appliquées server-side (sécurité : pas de confiance dans le client)
-  const discountPercent = getSubscriptionDiscount(months);
+  const discountPercent = months >= 12 ? 15 : months >= 3 ? 5 : 0;
   const baseAmount = monthly * months;
   const amount = Math.round(baseAmount * (1 - discountPercent / 100));
   const days = daysPerMonth * months;
@@ -259,9 +259,3 @@ export async function initiateEscortSubscriptionAction(input: {
   });
 }
 
-/** Réductions appliquées sur les abonnements pluri-mois. */
-export function getSubscriptionDiscount(months: number): number {
-  if (months >= 12) return 15;
-  if (months >= 3) return 5;
-  return 0;
-}

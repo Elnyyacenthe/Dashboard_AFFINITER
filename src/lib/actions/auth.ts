@@ -11,10 +11,22 @@ import { signIn, signOut } from "@/auth";
 import { signUpSchema, signInSchema } from "@/lib/validations/auth";
 import { rateLimit, RL } from "@/lib/rate-limit";
 import { getSettingNumber } from "@/lib/settings";
+import { getDashboardNamespace } from "@/lib/dashboard-namespace";
+import type { Role } from "@prisma/client";
 
 export type AuthState =
-  | { ok: true; nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number } }
+  | {
+      ok: true;
+      /** URL où le client doit naviguer après login (interne /admin OU externe dashboard.affiniter.cm). */
+      redirectTo?: string;
+      nextStep?: { type: "PAYMENT"; tier: "PREMIUM" | "VIP"; amount: number };
+    }
   | { ok: false; error: string; fieldErrors?: Record<string, string[]> };
+
+/** Construit l'URL de redirection finale selon le rôle après login. */
+function destinationForRole(role: Role): string {
+  return getDashboardNamespace(role);
+}
 
 /** Génère un code parrainage unique format AFF-XXXX. */
 function generateReferralCode(): string {
@@ -47,7 +59,19 @@ export async function loginAction(_prev: AuthState | null, formData: FormData): 
 
   try {
     await signIn("credentials", { ...parsed.data, redirect: false });
-    return { ok: true };
+    // On lit le rôle réel depuis la DB pour calculer la destination
+    const isEmail = parsed.data.identifier.includes("@");
+    const cleanedPhone = parsed.data.identifier
+      .replace(/\s/g, "")
+      .replace(/^237/, "+237");
+    const user = await prisma.user.findFirst({
+      where: isEmail
+        ? { email: parsed.data.identifier }
+        : { phone: cleanedPhone },
+      select: { role: true },
+    });
+    const redirectTo = user ? destinationForRole(user.role) : "/";
+    return { ok: true, redirectTo };
   } catch (e) {
     if (e instanceof AuthError) {
       return { ok: false, error: "Identifiants invalides" };
@@ -85,7 +109,7 @@ export async function registerAction(_prev: AuthState | null, formData: FormData
       fieldErrors: parsed.error.flatten().fieldErrors,
     };
   }
-  const { name, email, phone, password, role, tier, referralCode } = parsed.data;
+  const { name, email, phone, password, role, referralCode } = parsed.data;
   const cleanedPhone = phone.replace(/\s/g, "").replace(/^237/, "+237");
 
   // Anti-doublon (email, téléphone)
@@ -128,8 +152,12 @@ export async function registerAction(_prev: AuthState | null, formData: FormData
     select: { id: true },
   });
 
-  // C6 (audit Phase 1) : bonus parrainage à l'inscription SUPPRIMÉ (anti-farming).
-  // Le bonus n'est versé qu'au 1er paiement Premium/VIP du filleul.
+  // NOTE C6 (audit Phase 1) : le bonus parrainage à l'INSCRIPTION est SUPPRIMÉ.
+  // Anciennement, le parrain recevait 500 FCFA à chaque nouveau filleul inscrit
+  // → ouvrait la porte au farming (créer 100 faux comptes pour gagner 50 000 FCFA).
+  // Désormais le bonus est crédité UNIQUEMENT au 1er paiement du filleul
+  // (cf. maybeReferralBonusOnPayment dans lib/actions/wallet.ts).
+  // Le parrain reçoit en revanche une notification informative non monétaire.
   if (referrer) {
     await prisma.notification.create({
       data: {
@@ -144,14 +172,13 @@ export async function registerAction(_prev: AuthState | null, formData: FormData
   // Auto-login
   await signIn("credentials", { identifier: email, password, redirect: false });
 
-  // Si tier payant choisi → étape paiement
-  if (role === "ESCORT" && (tier === "PREMIUM" || tier === "VIP")) {
-    const priceKey = tier === "VIP" ? "pricing.vip.amount" : "pricing.premium.amount";
-    const amount = await getSettingNumber(priceKey, tier === "VIP" ? 15000 : 5000);
-    return { ok: true, nextStep: { type: "PAYMENT", tier, amount } };
+  // v3 — Tous les nouveaux comptes ESCORT vont vers /escort/abonnement
+  // (sans abonnement actif, ils ne peuvent rien faire).
+  if (role === "ESCORT") {
+    return { ok: true, redirectTo: "/escort/abonnement" };
   }
 
-  return { ok: true };
+  return { ok: true, redirectTo: destinationForRole(role) };
 }
 
 export async function logoutAction() {

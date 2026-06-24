@@ -1,9 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import Link from "next/link";
-import { Loader2, Crown, Star, Check } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,55 +10,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn, formatXAF } from "@/lib/utils";
 import { registerAction, type AuthState } from "@/lib/actions/auth";
 
-const TIERS = [
-  {
-    id: "STANDARD" as const,
-    name: "Standard",
-    price: 0,
-    icon: Check,
-    features: ["Annonce gratuite", "Modération 24h", "5 photos"],
-  },
-  {
-    id: "PREMIUM" as const,
-    name: "Premium",
-    price: 5000,
-    badge: "Recommandé",
-    icon: Star,
-    features: ["Badge Premium", "Mise en avant ville", "10 photos", "+300% vues"],
-  },
-  {
-    id: "VIP" as const,
-    name: "VIP",
-    price: 15000,
-    badge: "Visibilité max",
-    icon: Crown,
-    features: ["Badge VIP doré", "Top page d'accueil", "Photos illimitées", "+700% vues"],
-  },
-];
-
+/**
+ * Inscription = uniquement pour les ESCORTES.
+ * Les CLIENTS n'ont pas besoin de compte : ils consultent les annonces et
+ * contactent les escortes directement sur WhatsApp (gratuit).
+ */
 export function RegisterForm() {
-  const params = useSearchParams();
-  const defaultRole = params.get("role") === "ESCORT" ? "ESCORT" : "CLIENT";
-  const refParam = params.get("ref") ?? "";
-
-  const [role, setRole] = useState<"CLIENT" | "ESCORT">(defaultRole);
-  const [tier, setTier] = useState<"STANDARD" | "PREMIUM" | "VIP">("STANDARD");
   const [state, formAction, pending] = useActionState<AuthState | null, FormData>(
     registerAction,
     null,
   );
 
-  const redirecting = state?.ok === true;
-
   useEffect(() => {
     if (state?.ok) {
-      toast.success("Compte créé 🎉");
-      // Le serveur a déjà construit l'URL cible (interne /admin OU externe dashboard.affiniter.cm).
-      window.location.assign("/");
+      toast.success("Compte créé 🎉 — souscrivez maintenant à un plan pour publier vos annonces");
+      window.location.assign(state.redirectTo ?? "/escort/abonnement");
     } else if (state && !state.ok) {
       toast.error(state.error);
     }
@@ -68,70 +35,20 @@ export function RegisterForm() {
   return (
     <Card className="border-primary/20">
       <CardHeader>
-        <CardTitle className="font-display text-2xl">Créer un compte</CardTitle>
-        <CardDescription>Rejoignez la communauté en quelques secondes</CardDescription>
+        <CardTitle className="flex items-center gap-2 font-display text-2xl">
+          <Sparkles className="h-6 w-6 text-primary" />
+          Devenir escort sur Affiniter
+        </CardTitle>
+        <CardDescription>
+          Publiez vos annonces auprès de milliers de clients camerounais. Inscription gratuite,
+          abonnement mensuel à partir de <strong>2 000 FCFA / mois</strong>.
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={role} onValueChange={(v) => setRole(v as "CLIENT" | "ESCORT")} className="mb-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="CLIENT">Je suis client</TabsTrigger>
-            <TabsTrigger value="ESCORT">Je suis escort</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
         <form action={formAction} className="space-y-4">
-          <input type="hidden" name="role" value={role} />
-          <input type="hidden" name="tier" value={tier} />
-
-          {/* Sélecteur de tier (escort uniquement) */}
-          {role === "ESCORT" && (
-            <div className="space-y-2">
-              <Label>Choisissez votre formule</Label>
-              <div className="grid gap-2 sm:grid-cols-3">
-                {TIERS.map((t) => {
-                  const Icon = t.icon;
-                  const selected = tier === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTier(t.id)}
-                      className={cn(
-                        "relative rounded-lg border p-3 text-left transition-all",
-                        selected
-                          ? "border-primary bg-primary/10 shadow-md shadow-primary/30"
-                          : "border-border hover:border-primary/40",
-                      )}
-                    >
-                      {t.badge && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-black">
-                          {t.badge}
-                        </span>
-                      )}
-                      <Icon className="h-5 w-5 text-primary" />
-                      <p className="mt-1 font-display font-bold">{t.name}</p>
-                      <p className="text-xs font-bold text-primary">
-                        {t.price === 0 ? "Gratuit" : formatXAF(t.price)}
-                      </p>
-                      <ul className="mt-1 space-y-0.5 text-[10px] text-muted-foreground">
-                        {t.features.slice(0, 2).map((f) => (
-                          <li key={f} className="flex gap-1">
-                            <Check className="h-2.5 w-2.5 mt-0.5 shrink-0 text-emerald-400" /> {f}
-                          </li>
-                        ))}
-                      </ul>
-                    </button>
-                  );
-                })}
-              </div>
-              {tier !== "STANDARD" && (
-                <p className="rounded bg-amber-500/10 p-2 text-xs text-amber-300">
-                  💳 Après l'inscription, vous serez redirigé(e) pour payer{" "}
-                  <strong>{formatXAF(TIERS.find((t) => t.id === tier)!.price)}</strong> par MoMo/Orange.
-                </p>
-              )}
-            </div>
-          )}
+          {/* Le rôle est toujours ESCORT */}
+          <input type="hidden" name="role" value="ESCORT" />
+          <input type="hidden" name="tier" value="STANDARD" />
 
           <div className="space-y-2">
             <Label htmlFor="name">Pseudo / Nom</Label>
@@ -170,39 +87,38 @@ export function RegisterForm() {
               <Checkbox id="acceptTerms" name="acceptTerms" required />
               <Label htmlFor="acceptTerms" className="text-xs leading-tight">
                 J'accepte les{" "}
-                <a
-                  href="/cgu"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
+                <a href="/cgu" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   CGU ↗
                 </a>{" "}
                 et la{" "}
-                <a
-                  href="/confidentialite"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
+                <a href="/confidentialite" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                   politique de confidentialité ↗
                 </a>.
               </Label>
             </div>
           </div>
 
+          <p className="rounded bg-primary/10 p-3 text-xs text-primary">
+            💡 Après l'inscription, vous serez redirigée vers la page d'abonnement pour activer
+            votre compte (Standard 2 000, Premium 5 000 ou VIP 15 000 FCFA / mois).
+          </p>
+
           <Button type="submit" disabled={pending} className="w-full" size="lg">
             {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {role === "ESCORT" && tier !== "STANDARD"
-              ? `Continuer vers le paiement (${formatXAF(TIERS.find((t) => t.id === tier)!.price)})`
-              : "Créer mon compte"}
+            Créer mon compte escort
           </Button>
 
           <p className="text-center text-sm text-muted-foreground">
-            Déjà inscrit ?{" "}
+            Déjà inscrite ?{" "}
             <Link href="/connexion" className="text-primary hover:underline">
               Se connecter
             </Link>
+          </p>
+          <p className="text-center text-xs text-muted-foreground">
+            <strong>Client</strong> ? Vous n'avez pas besoin de compte —{" "}
+            <Link href="/recherche" className="text-primary hover:underline">
+              parcourez les annonces directement
+            </Link>.
           </p>
         </form>
       </CardContent>

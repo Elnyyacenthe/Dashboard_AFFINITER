@@ -4,7 +4,7 @@ module.exports = {
       name: "affiniter-dashboard",
       cwd: "/var/www/affiniter-dashboard",
       script: "node_modules/.bin/next",
-      args: "start -p 3100",
+      args: "start -H 127.0.0.1 -p 3100",
       instances: 1,
       exec_mode: "fork",
       autorestart: true,
